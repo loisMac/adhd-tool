@@ -148,6 +148,8 @@ type ToolIconName =
 const STORAGE_PREFIX = 'calm-space'
 const THEME_KEY = `${STORAGE_PREFIX}:theme`
 const DAY_MODE_KEY = `${STORAGE_PREFIX}:day-mode`
+const CALM_VIEW_KEY = `${STORAGE_PREFIX}:calm-view`
+const ESSENTIALS_ONLY_KEY = `${STORAGE_PREFIX}:essentials-only`
 
 const toolLinks: Array<{ id: ToolId; label: string }> = [
   { id: 'task-chunker', label: 'Task Splitter' },
@@ -162,6 +164,14 @@ const toolLinks: Array<{ id: ToolId; label: string }> = [
   { id: 'pomodoro', label: 'Pomodoro' },
   { id: 'self-care', label: 'Body Check' },
   { id: 'wind-down', label: 'Wind-down' },
+]
+
+const essentialToolIds: ToolId[] = [
+  'task-chunker',
+  'body-doubling',
+  'next-task',
+  'stuck-rescue',
+  'wind-down',
 ]
 
 const toolTipsText: Record<ToolId, string> = {
@@ -321,6 +331,31 @@ const loadStoredDayMode = (): DayMode => {
   }
 
   return 'gentle'
+}
+
+const loadStoredCalmView = (): boolean => {
+  try {
+    const raw = localStorage.getItem(CALM_VIEW_KEY)
+    if (raw === null) {
+      return true
+    }
+
+    return raw === 'true'
+  } catch {
+    // Silently fail
+  }
+
+  return true
+}
+
+const loadStoredEssentialsOnly = (): boolean => {
+  try {
+    return localStorage.getItem(ESSENTIALS_ONLY_KEY) === 'true'
+  } catch {
+    // Silently fail
+  }
+
+  return false
 }
 
 const loadStoredProfile = (profileId: string) => {
@@ -511,6 +546,8 @@ function App() {
   const [stuckRescueSecondsLeft, setStuckRescueSecondsLeft] = useState(0)
   const [activeTool, setActiveTool] = useState<ToolId>('task-chunker')
   const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
+  const [calmView, setCalmView] = useState<boolean>(() => loadStoredCalmView())
+  const [essentialsOnly, setEssentialsOnly] = useState<boolean>(() => loadStoredEssentialsOnly())
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -520,6 +557,32 @@ function App() {
   useEffect(() => {
     localStorage.setItem(DAY_MODE_KEY, dayMode)
   }, [dayMode])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CALM_VIEW_KEY, String(calmView))
+    } catch {
+      // Silently fail if storage is unavailable
+    }
+  }, [calmView])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ESSENTIALS_ONLY_KEY, String(essentialsOnly))
+    } catch {
+      // Silently fail if storage is unavailable
+    }
+  }, [essentialsOnly])
+
+  const visibleToolLinks = useMemo(
+    () =>
+      essentialsOnly
+        ? toolLinks.filter((tool) => essentialToolIds.includes(tool.id))
+        : toolLinks,
+    [essentialsOnly],
+  )
+
+  const isToolVisible = (toolId: ToolId) => !essentialsOnly || essentialToolIds.includes(toolId)
 
   useEffect(() => {
     try {
@@ -666,7 +729,7 @@ function App() {
       },
     )
 
-    toolLinks.forEach((tool) => {
+    visibleToolLinks.forEach((tool) => {
       const element = document.getElementById(tool.id)
       if (element) {
         observer.observe(element)
@@ -674,7 +737,13 @@ function App() {
     })
 
     return () => observer.disconnect()
-  }, [])
+  }, [visibleToolLinks])
+
+  useEffect(() => {
+    if (!visibleToolLinks.some((tool) => tool.id === activeTool)) {
+      setActiveTool(visibleToolLinks[0]?.id ?? 'task-chunker')
+    }
+  }, [visibleToolLinks, activeTool])
 
   const currentDayMode = useMemo(
     () => dayModes.find((item) => item.id === dayMode) ?? dayModes[0],
@@ -790,12 +859,13 @@ function App() {
     data.timeAnchor.taskLabel.trim().length > 0 ||
     data.timeAnchor.lastPromptAt !== null ||
     data.timeAnchor.lastPromptText.trim().length > 0
-  const activeToolLabel = toolLinks.find((link) => link.id === activeTool)?.label ?? toolLinks[0].label
+  const activeToolLabel =
+    visibleToolLinks.find((link) => link.id === activeTool)?.label ?? visibleToolLinks[0].label
   const activeToolIndex = Math.max(
     0,
-    toolLinks.findIndex((link) => link.id === activeTool),
+    visibleToolLinks.findIndex((link) => link.id === activeTool),
   )
-  const journeyPercent = ((activeToolIndex + 1) / toolLinks.length) * 100
+  const journeyPercent = ((activeToolIndex + 1) / Math.max(1, visibleToolLinks.length)) * 100
   const readyToolCount = [
     hasTaskChunkerContent,
     hasOpenTasks || hasCompletedTasks,
@@ -1248,7 +1318,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${calmView ? 'calm-view' : ''}`}>
       <a className="skip-link" href="#main-content">
         Skip to tools
       </a>
@@ -1322,7 +1392,7 @@ function App() {
 
       <section className="timer-info" aria-label="Work timer explanation">
         <p>
-          {preferredName ? `Welcome, ${preferredName}. ` : 'Welcome. '}This is your Calm Space dashboard, built to reduce overwhelm with clear, supportive tools for planning, focus, check-ins, and gentle end-of-day wrap-up.
+          {preferredName ? `Welcome, ${preferredName}. ` : 'Welcome. '}Take what helps and ignore the rest. Calm Space is here to make your day feel lighter, one small step at a time.
         </p>
       </section>
 
@@ -1426,8 +1496,8 @@ function App() {
 
             <div className="hero-stat-grid">
               <article className="hero-stat">
-                <strong>{toolLinks.length}</strong>
-                <span>support tools</span>
+                <strong>{visibleToolLinks.length}</strong>
+                <span>{essentialsOnly ? 'essential tools' : 'support tools'}</span>
               </article>
               <article className="hero-stat">
                 <strong>{readyToolCount}</strong>
@@ -1443,7 +1513,7 @@ function App() {
               <div className="hero-progress-head">
                 <span>Page journey</span>
                 <strong>
-                  {activeToolIndex + 1}/{toolLinks.length}
+                  {activeToolIndex + 1}/{visibleToolLinks.length}
                 </strong>
               </div>
               <div className="progress-meter" aria-hidden="true">
@@ -1493,6 +1563,50 @@ function App() {
               ))}
             </div>
           </div>
+
+          <div className="density-picker">
+            <p>Visual intensity</p>
+            <div className="chip-row">
+              <button
+                type="button"
+                className={`chip ${calmView ? '' : 'active-chip'}`}
+                onClick={() => setCalmView(false)}
+              >
+                <strong>Full</strong>
+                <span>Shows all visual cues and extras</span>
+              </button>
+              <button
+                type="button"
+                className={`chip ${calmView ? 'active-chip' : ''}`}
+                onClick={() => setCalmView(true)}
+              >
+                <strong>Calm</strong>
+                <span>Reduces visual noise and clutter</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="tool-set-picker">
+            <p>Tool set</p>
+            <div className="chip-row">
+              <button
+                type="button"
+                className={`chip ${essentialsOnly ? 'active-chip' : ''}`}
+                onClick={() => setEssentialsOnly(true)}
+              >
+                <strong>Essentials only</strong>
+                <span>Show a smaller set to reduce overwhelm</span>
+              </button>
+              <button
+                type="button"
+                className={`chip ${essentialsOnly ? '' : 'active-chip'}`}
+                onClick={() => setEssentialsOnly(false)}
+              >
+                <strong>All tools</strong>
+                <span>Show the full toolkit</span>
+              </button>
+            </div>
+          </div>
         </section>
       </header>
 
@@ -1502,7 +1616,7 @@ function App() {
           <span className="jump-status">Now viewing: {activeToolLabel}</span>
         </div>
         <ul>
-          {toolLinks.map((link) => (
+          {visibleToolLinks.map((link) => (
             <li key={link.id}>
               <a
                 href={`#${link.id}`}
@@ -1520,7 +1634,7 @@ function App() {
       </nav>
 
       <main id="main-content" className="tool-stack">
-        <section id="task-chunker" className="tool-panel fade-in" aria-labelledby="chunker-heading">
+        <section id="task-chunker" className={`tool-panel fade-in ${isToolVisible('task-chunker') ? '' : 'tool-hidden'}`} aria-labelledby="chunker-heading">
           <ToolHeading
             id="chunker-heading"
             title="Task splitter"
@@ -1579,7 +1693,7 @@ function App() {
           </button>
         </section>
 
-        <section id="body-doubling" className="tool-panel fade-in" aria-labelledby="body-double-heading">
+        <section id="body-doubling" className={`tool-panel fade-in ${isToolVisible('body-doubling') ? '' : 'tool-hidden'}`} aria-labelledby="body-double-heading">
           <ToolHeading
             id="body-double-heading"
             title="Body doubling timer"
@@ -1656,7 +1770,7 @@ function App() {
           </div>
         </section>
 
-        <section id="next-task" className="tool-panel fade-in" aria-labelledby="next-task-heading">
+        <section id="next-task" className={`tool-panel fade-in ${isToolVisible('next-task') ? '' : 'tool-hidden'}`} aria-labelledby="next-task-heading">
           <ToolHeading
             id="next-task-heading"
             title="Pick my next task"
@@ -1742,7 +1856,7 @@ function App() {
           </button>
         </section>
 
-        <section id="transition-helper" className="tool-panel fade-in" aria-labelledby="transition-heading">
+        <section id="transition-helper" className={`tool-panel fade-in ${isToolVisible('transition-helper') ? '' : 'tool-hidden'}`} aria-labelledby="transition-heading">
           <ToolHeading
             id="transition-heading"
             title="Transition helper"
@@ -1860,7 +1974,7 @@ function App() {
           </button>
         </section>
 
-        <section id="stuck-rescue" className="tool-panel fade-in" aria-labelledby="stuck-heading">
+        <section id="stuck-rescue" className={`tool-panel fade-in ${isToolVisible('stuck-rescue') ? '' : 'tool-hidden'}`} aria-labelledby="stuck-heading">
           <ToolHeading
             id="stuck-heading"
             title="Stuck rescue"
@@ -1933,7 +2047,7 @@ function App() {
           </button>
         </section>
 
-        <section id="time-anchor" className="tool-panel fade-in" aria-labelledby="anchor-heading">
+        <section id="time-anchor" className={`tool-panel fade-in ${isToolVisible('time-anchor') ? '' : 'tool-hidden'}`} aria-labelledby="anchor-heading">
           <ToolHeading
             id="anchor-heading"
             title="Time anchor"
@@ -2000,7 +2114,7 @@ function App() {
           </button>
         </section>
 
-        <section id="money-tracker" className="tool-panel fade-in" aria-labelledby="finance-heading">
+        <section id="money-tracker" className={`tool-panel fade-in ${isToolVisible('money-tracker') ? '' : 'tool-hidden'}`} aria-labelledby="finance-heading">
           <ToolHeading
             id="finance-heading"
             title="Track invoices you sent"
@@ -2118,7 +2232,7 @@ function App() {
           </button>
         </section>
 
-        <section id="brain-dump" className="tool-panel fade-in" aria-labelledby="brain-dump-heading">
+        <section id="brain-dump" className={`tool-panel fade-in ${isToolVisible('brain-dump') ? '' : 'tool-hidden'}`} aria-labelledby="brain-dump-heading">
           <ToolHeading
             id="brain-dump-heading"
             title="Brain dump"
@@ -2286,7 +2400,7 @@ function App() {
           </button>
         </section>
 
-        <section id="weekly-review" className="tool-panel fade-in" aria-labelledby="weekly-heading">
+        <section id="weekly-review" className={`tool-panel fade-in ${isToolVisible('weekly-review') ? '' : 'tool-hidden'}`} aria-labelledby="weekly-heading">
           <ToolHeading
             id="weekly-heading"
             title="Weekly review prompts"
@@ -2383,7 +2497,7 @@ function App() {
           </button>
         </section>
 
-        <section id="pomodoro" className="tool-panel fade-in" aria-labelledby="pomodoro-heading">
+        <section id="pomodoro" className={`tool-panel fade-in ${isToolVisible('pomodoro') ? '' : 'tool-hidden'}`} aria-labelledby="pomodoro-heading">
           <ToolHeading
             id="pomodoro-heading"
             title="Flexible pomodoro"
@@ -2481,7 +2595,7 @@ function App() {
           </div>
         </section>
 
-        <section id="self-care" className="tool-panel fade-in" aria-labelledby="selfcare-heading">
+        <section id="self-care" className={`tool-panel fade-in ${isToolVisible('self-care') ? '' : 'tool-hidden'}`} aria-labelledby="selfcare-heading">
           <ToolHeading
             id="selfcare-heading"
             title="Body check-in"
@@ -2539,7 +2653,7 @@ function App() {
           </button>
         </section>
 
-        <section id="wind-down" className="tool-panel fade-in" aria-labelledby="wind-down-heading">
+        <section id="wind-down" className={`tool-panel fade-in ${isToolVisible('wind-down') ? '' : 'tool-hidden'}`} aria-labelledby="wind-down-heading">
           <ToolHeading
             id="wind-down-heading"
             title="End-of-day wind-down"
@@ -2673,8 +2787,9 @@ function App() {
           <p className="tool-category">Support</p>
           <h2>Keep Calm Space growing</h2>
           <p>
-            If this toolkit helps you, you can support it on Ko-fi. Donations help cover hosting,
-            updates, and new tools. No pressure at all. Use it freely either way.
+            Calm Space is made by a neurodivergent human for other neurodivergent humans.
+            If it helps, you can support it on Ko-fi. Donations help with hosting, updates,
+            and new tools. No pressure at all.
           </p>
           <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
             Support on Ko-fi
@@ -2685,10 +2800,11 @@ function App() {
           <div>
             <p className="footer-kicker">Calm Space</p>
             <p className="footer-note">
-              Calm Space keeps your data in this browser unless you choose to share it.
+              Calm Space stores your entries in this browser only. If you clear browser data or switch devices, your saved data will not move with you.
             </p>
           </div>
           <div className="footer-links">
+            <a href="/privacy.html">Privacy &amp; data</a>
             <a href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
               Support on Ko-fi
             </a>

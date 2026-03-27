@@ -1,11 +1,17 @@
 {
+  "id": "/",
   "name": "Calm Space",
   "short_name": "Calm Space",
   "start_url": "/",
+  "scope": "/",
+  "lang": "en-GB",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
   "background_color": "#f4efe8",
   "theme_color": "#44635c",
   "description": "ADHD-friendly tools for focus, planning, and daily routines.",
+  "categories": ["productivity", "health", "utilities"],
   "icons": [
     {
       "src": "/calmspace-logo.svg",
