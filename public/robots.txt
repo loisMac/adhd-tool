@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://calmspacetools.co.uk/sitemap.xml
