@@ -358,7 +358,7 @@ const loadStoredEssentialsOnly = (): boolean => {
   try {
     const raw = localStorage.getItem(ESSENTIALS_ONLY_KEY)
     if (raw === null) {
-      return true
+      return false
     }
 
     return raw === 'true'
@@ -712,7 +712,7 @@ function App() {
     setSingleToolId(toolId)
     setActiveTool(toolId)
     setToolView('single')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    document.getElementById('main-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   useEffect(() => {
@@ -1600,7 +1600,7 @@ function App() {
           <details className="setup-details">
             <summary>Customise your setup (optional)</summary>
             <p className="setup-note">
-              Default is <strong>Essentials only</strong> and <strong>One tool at a time</strong>.
+              Default is <strong>All tools</strong> and <strong>One tool at a time</strong>.
               You can change that here whenever you like.
             </p>
 
