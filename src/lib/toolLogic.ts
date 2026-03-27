@@ -1,27 +1,17 @@
-export type SortedBrainDump = {
-  work: string[]
-  life: string[]
-  health: string[]
-  admin: string[]
-  money: string[]
-  creative: string[]
-  misc: string[]
-}
-
-export const emptyBrainDump = (): SortedBrainDump => ({
-  work: [],
-  life: [],
-  health: [],
-  admin: [],
-  money: [],
-  creative: [],
-  misc: [],
-})
-
 export const formatTime = (totalSeconds: number) => {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+const summarizeInput = (input: string, maxLength = 60) => {
+  const cleaned = input.replace(/\s+/g, ' ').trim().replace(/[.!?,;:]+$/, '')
+
+  if (cleaned.length <= maxLength) {
+    return cleaned
+  }
+
+  return `${cleaned.slice(0, maxLength - 3).trimEnd()}...`
 }
 
 export const formatDuration = (totalSeconds: number) => {
@@ -48,53 +38,27 @@ export const chunkTask = (input: string) => {
     return splitByClauses
   }
 
+  const focus = summarizeInput(cleaned)
+
   return [
-    'Write what done looks like in one line.',
-    'Pick the first action that takes 5 to 10 minutes.',
-    'Start a short timer and do only that first action.',
+    `Write what "${focus}" looks like when it is done.`,
+    `Pick the first 5 to 10 minute piece of "${focus}".`,
+    `Start a short timer and do only that first piece of "${focus}".`,
   ]
 }
 
-export const sortBrainDump = (text: string): SortedBrainDump => {
-  const sorted = emptyBrainDump()
-  const lines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  lines.forEach((line) => {
-    const lower = line.toLowerCase()
-
-    if (/(client|meeting|project|deadline|team|email)/.test(lower)) {
-      sorted.work.push(line)
-      return
-    }
-    if (/(rent|invoice|money|budget|tax|pay)/.test(lower)) {
-      sorted.money.push(line)
-      return
-    }
-    if (/(doctor|sleep|medicine|walk|eat|water|health)/.test(lower)) {
-      sorted.health.push(line)
-      return
-    }
-    if (/(form|admin|document|renew|appointment|bank)/.test(lower)) {
-      sorted.admin.push(line)
-      return
-    }
-    if (/(idea|write|draw|music|design|create)/.test(lower)) {
-      sorted.creative.push(line)
-      return
-    }
-    if (/(home|clean|laundry|kitchen|family|shop|groceries)/.test(lower)) {
-      sorted.life.push(line)
-      return
-    }
-
-    sorted.misc.push(line)
-  })
-
-  return sorted
-}
+export const getRescueActions = () => [
+  'Stand up. Stretch your arms above your head. Sit back down.',
+  'Take 3 slow breaths — in through your nose, out through your mouth.',
+  'Drink a glass of water right now.',
+  'Shake out your hands and roll your shoulders back.',
+  'Look away from the screen for 30 seconds and let your eyes rest.',
+  'Walk to another room and back, then sit down and open the task.',
+  'Put both feet flat on the floor. Take one breath. Name 3 things you can see.',
+  'Splash cold water on your wrists or hands.',
+  'Write one sentence: exactly what the very next action is.',
+  'Set a 2-minute timer. Just sit with it. Begin when it goes off.',
+]
 
 type SelfCareReminder = {
   message: string

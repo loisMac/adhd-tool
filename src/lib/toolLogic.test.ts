@@ -7,8 +7,8 @@ import {
   formatTime,
   getAccumulatedWorkSeconds,
   getBreakSeconds,
+  getRescueActions,
   getSelfCareReminder,
-  sortBrainDump,
 } from './toolLogic'
 
 describe('toolLogic', () => {
@@ -22,20 +22,19 @@ describe('toolLogic', () => {
 
   it('falls back to gentle starter steps for short input', () => {
     expect(chunkTask('finish taxes')).toEqual([
-      'Write what done looks like in one line.',
-      'Pick the first action that takes 5 to 10 minutes.',
-      'Start a short timer and do only that first action.',
+      'Write what "finish taxes" looks like when it is done.',
+      'Pick the first 5 to 10 minute piece of "finish taxes".',
+      'Start a short timer and do only that first piece of "finish taxes".',
     ])
   })
 
-  it('sorts brain dump lines into categories', () => {
-    const sorted = sortBrainDump('email client\nbook doctor\npay rent\ndo laundry\nsketch idea')
+  it('returns a list of grounding reset actions', () => {
+    const actions = getRescueActions()
 
-    expect(sorted.work).toEqual(['email client'])
-    expect(sorted.health).toEqual(['book doctor'])
-    expect(sorted.money).toEqual(['pay rent'])
-    expect(sorted.life).toEqual(['do laundry'])
-    expect(sorted.creative).toEqual(['sketch idea'])
+    expect(actions.length).toBeGreaterThan(0)
+    expect(actions.some((a) => /breath/i.test(a))).toBe(true)
+    expect(actions.some((a) => /water/i.test(a))).toBe(true)
+    expect(actions.some((a) => /stand/i.test(a))).toBe(true)
   })
 
   it('formats short durations as mm:ss', () => {

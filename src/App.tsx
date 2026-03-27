@@ -3,14 +3,13 @@ import './App.css'
 import {
   clampNumber,
   chunkTask,
-  emptyBrainDump,
   formatLastCheck,
   formatDuration,
   formatTime,
   getAccumulatedWorkSeconds,
   getBreakSeconds,
+  getRescueActions,
   getSelfCareReminder,
-  sortBrainDump,
 } from './lib/toolLogic'
 
 type TaskItem = {
@@ -27,14 +26,10 @@ type InvoiceEntry = {
   paid: boolean
 }
 
-type SortedBrainDump = {
-  work: string[]
-  life: string[]
-  health: string[]
-  admin: string[]
-  money: string[]
-  creative: string[]
-  misc: string[]
+type BrainDumpItem = {
+  id: string
+  text: string
+  triage: 'today' | 'later' | 'release' | null
 }
 
 type WindDownItem = {
@@ -46,6 +41,8 @@ type WindDownItem = {
 type WindDown = {
   items: WindDownItem[]
   notes: string
+  noteWrittenDate: string | null
+  noteShown: boolean
 }
 
 type SelfCare = {
@@ -87,6 +84,7 @@ type TimeAnchor = {
 }
 
 type ProfileData = {
+  displayName: string
   bigTaskInput: string
   chunkedSteps: string[]
   taskInput: string
@@ -100,7 +98,7 @@ type ProfileData = {
   invoiceDate: string
   invoices: InvoiceEntry[]
   brainDumpInput: string
-  sortedBrainDump: SortedBrainDump
+  brainDumpItems: BrainDumpItem[]
   weeklyReview: WeeklyReview
   transitionHelper: TransitionHelper
   stuckRescue: StuckRescue
@@ -182,7 +180,7 @@ const toolTipsText: Record<ToolId, string> = {
     'This helps you close the day. Done is better than perfect.',
   'money-tracker':
     'Log invoices as you send them so you can see what is paid and what is still outstanding.',
-  'brain-dump': 'One thought per line. Then sort.',
+  'brain-dump': 'Get it all out. Then park each thought somewhere: do it today, save it for later, or let it go.',
   'weekly-review':
     'Short answers are fine. You are only looking for what helped and what did not.',
   pomodoro: 'Adjust focus and rest times to match your energy.',
@@ -234,6 +232,7 @@ const defaultTips = (): TipsState =>
   Object.fromEntries(Object.keys(toolTipsText).map((id) => [id, true])) as TipsState
 
 const defaultData = (): ProfileData => ({
+  displayName: '',
   bigTaskInput: '',
   chunkedSteps: [],
   taskInput: '',
@@ -244,13 +243,15 @@ const defaultData = (): ProfileData => ({
   windDown: {
     items: [],
     notes: '',
+    noteWrittenDate: null,
+    noteShown: false,
   },
   invoiceClient: '',
   invoiceAmount: '',
   invoiceDate: '',
   invoices: [],
   brainDumpInput: '',
-  sortedBrainDump: emptyBrainDump(),
+  brainDumpItems: [],
   weeklyReview: {
     win: '',
     friction: '',
@@ -342,7 +343,7 @@ const loadStoredProfile = (profileId: string) => {
             stuckRescue: { ...empty.stuckRescue, ...parsed.stuckRescue },
             timeAnchor: { ...empty.timeAnchor, ...parsed.timeAnchor },
             selfCare: { ...empty.selfCare, ...parsed.selfCare },
-            sortedBrainDump: { ...emptyBrainDump(), ...parsed.sortedBrainDump },
+            brainDumpItems: parsed.brainDumpItems ?? [],
             tasks: parsed.tasks ?? [],
             chunkedSteps: parsed.chunkedSteps ?? [],
             invoices: parsed.invoices ?? [],
@@ -394,20 +395,19 @@ const companionLines = [
   'Quiet progress still counts.',
 ]
 
-const rescueActions = [
-  'Do 2 minutes only.',
-  'Reduce the task to one tiny step.',
-  'Write the very next click/action.',
-  'Stand, stretch, then restart.',
-  'Open the file and add one line.',
-  'Send a short "need 15 min" message.',
-]
-
 const formatClock = (timestamp: number) =>
   new Intl.DateTimeFormat('en-GB', {
     hour: 'numeric',
     minute: '2-digit',
   }).format(timestamp)
+
+const lowercaseFirst = (text: string) => {
+  if (!text) {
+    return text
+  }
+
+  return `${text.charAt(0).toLowerCase()}${text.slice(1)}`
+}
 
 const playToneSequence = (tones: number[], duration = 0.14, gap = 0.05) => {
   try {
@@ -474,14 +474,17 @@ function ToolHeading({
   title,
   copy,
   icon,
+  category,
 }: {
   id: string
   title: string
   copy: string
   icon: ToolIconName
+  category: string
 }) {
   return (
     <div className="panel-head">
+      <p className="tool-category">{category}</p>
       <div className="panel-title-row">
         <span className="tool-icon-wrap">
           <ToolIcon name={icon} />
@@ -506,6 +509,8 @@ function App() {
   const [workElapsedSeconds, setWorkElapsedSeconds] = useState(storedProfile.workElapsedSeconds)
   const [breakElapsedSeconds, setBreakElapsedSeconds] = useState(storedProfile.breakElapsedSeconds)
   const [stuckRescueSecondsLeft, setStuckRescueSecondsLeft] = useState(0)
+  const [activeTool, setActiveTool] = useState<ToolId>('task-chunker')
+  const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -624,7 +629,9 @@ function App() {
         }
 
         const taskText = prev.timeAnchor.taskLabel.trim() || 'your current task'
-        const prompt = `It is ${formatClock(now)}. Still on ${taskText}?`
+        const prompt = prev.displayName.trim().length > 0
+          ? `It is ${formatClock(now)}, ${prev.displayName.trim()}. Still on ${taskText}?`
+          : `It is ${formatClock(now)}. Still on ${taskText}?`
 
         playToneSequence([659.25, 783.99], 0.08, 0.04)
 
@@ -641,6 +648,33 @@ function App() {
 
     return () => window.clearInterval(timer)
   }, [data.isWorking])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntries = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((entryA, entryB) => entryB.intersectionRatio - entryA.intersectionRatio)
+
+        if (visibleEntries.length > 0) {
+          setActiveTool(visibleEntries[0].target.id as ToolId)
+        }
+      },
+      {
+        rootMargin: '-18% 0px -55% 0px',
+        threshold: [0.2, 0.35, 0.5, 0.7],
+      },
+    )
+
+    toolLinks.forEach((tool) => {
+      const element = document.getElementById(tool.id)
+      if (element) {
+        observer.observe(element)
+      }
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   const currentDayMode = useMemo(
     () => dayModes.find((item) => item.id === dayMode) ?? dayModes[0],
@@ -669,9 +703,10 @@ function App() {
     return answers.length
   }, [data.weeklyReview])
 
-  const totalBrainDumpItems = useMemo(() => {
-    return Object.values(data.sortedBrainDump).reduce((sum, entries) => sum + entries.length, 0)
-  }, [data.sortedBrainDump])
+  const pendingBrainDumpItems = data.brainDumpItems.filter((i) => i.triage === null)
+  const todayBrainDumpItems = data.brainDumpItems.filter((i) => i.triage === 'today')
+  const laterBrainDumpItems = data.brainDumpItems.filter((i) => i.triage === 'later')
+  const releaseBrainDumpItems = data.brainDumpItems.filter((i) => i.triage === 'release')
 
   const bodyDoubleProgress = useMemo(() => {
     const total = Math.max(1, data.bodyDoubleMinutes * 60)
@@ -681,19 +716,38 @@ function App() {
 
   const bodyDoubleCompanionLine = useMemo(() => {
     if (!bodyDoubleRunning) {
-      return 'Press Start when ready. I will stay here with you.'
+      const baseLine = 'Press Start when ready. I will stay here with you.'
+      return data.displayName.trim().length > 0
+        ? `${data.displayName.trim()}, ${lowercaseFirst(baseLine)}`
+        : baseLine
     }
 
     const elapsed = data.bodyDoubleMinutes * 60 - data.bodyDoubleSecondsLeft
     const index = Math.floor(Math.max(0, elapsed) / 90) % companionLines.length
-    return companionLines[index]
-  }, [bodyDoubleRunning, data.bodyDoubleMinutes, data.bodyDoubleSecondsLeft])
+    const baseLine = companionLines[index]
+    return data.displayName.trim().length > 0
+      ? `${data.displayName.trim()}, ${lowercaseFirst(baseLine)}`
+      : baseLine
+  }, [bodyDoubleRunning, data.bodyDoubleMinutes, data.bodyDoubleSecondsLeft, data.displayName])
 
   const selfCareReminder = getSelfCareReminder({
     lastFoodCheck: data.selfCare.lastFoodCheck,
     lastWaterCheck: data.selfCare.lastWaterCheck,
   })
+  const todayDateKey = new Date().toISOString().slice(0, 10)
+  const preferredName = data.displayName.trim()
+  const selfCareReminderText = selfCareReminder
+    ? preferredName
+      ? `${preferredName}, ${lowercaseFirst(selfCareReminder.message)}`
+      : selfCareReminder.message
+    : ''
   const selfCareStatus = formatLastCheck(data.selfCare.lastReset)
+  const noteWrittenDate = data.windDown.noteWrittenDate
+  const showFutureYouNote = noteWrittenDate
+    ? data.windDown.notes.trim().length > 0 &&
+      noteWrittenDate < todayDateKey &&
+      !data.windDown.noteShown
+    : false
   const hasTaskChunkerContent = Boolean(data.bigTaskInput.trim() || data.chunkedSteps.length > 0)
   const canAddTask = data.taskInput.trim().length > 0
   const hasCompletedTasks = data.tasks.some((task) => task.done)
@@ -713,7 +767,7 @@ function App() {
     data.invoiceAmount.trim().length > 0 ||
     data.invoiceDate.length > 0 ||
     data.invoices.length > 0
-  const hasBrainDumpContent = data.brainDumpInput.trim().length > 0 || totalBrainDumpItems > 0
+  const hasBrainDumpContent = data.brainDumpInput.trim().length > 0 || data.brainDumpItems.length > 0
   const hasWeeklyReviewContent = Object.values(data.weeklyReview).some((item) => item.trim().length > 0)
   const hasPomodoroDeviation =
     pomodoroRunning || pomodoroMode !== 'focus' || data.pomodoroSecondsLeft !== data.pomodoroWork * 60
@@ -736,6 +790,25 @@ function App() {
     data.timeAnchor.taskLabel.trim().length > 0 ||
     data.timeAnchor.lastPromptAt !== null ||
     data.timeAnchor.lastPromptText.trim().length > 0
+  const activeToolLabel = toolLinks.find((link) => link.id === activeTool)?.label ?? toolLinks[0].label
+  const activeToolIndex = Math.max(
+    0,
+    toolLinks.findIndex((link) => link.id === activeTool),
+  )
+  const journeyPercent = ((activeToolIndex + 1) / toolLinks.length) * 100
+  const readyToolCount = [
+    hasTaskChunkerContent,
+    hasOpenTasks || hasCompletedTasks,
+    hasTransitionContent,
+    hasRescueContent,
+    hasAnchorContent,
+    hasMoneyTrackerContent,
+    hasBrainDumpContent,
+    hasWeeklyReviewContent,
+    hasPomodoroDeviation,
+    hasSelfCareContent,
+    hasWindDownContent,
+  ].filter(Boolean).length
 
   const confirmReset = (message: string, hasContent: boolean, action: () => void) => {
     if (!hasContent) {
@@ -919,8 +992,9 @@ function App() {
   }
 
   const chooseRescueAction = () => {
-    const index = Math.floor(Math.random() * rescueActions.length)
-    const chosen = rescueActions[index]
+    const actions = getRescueActions()
+    const index = Math.floor(Math.random() * actions.length)
+    const chosen = actions[index]
 
     setData((prev) => ({
       ...prev,
@@ -1018,6 +1092,8 @@ function App() {
         windDown: {
           items: [],
           notes: '',
+          noteWrittenDate: null,
+          noteShown: false,
         },
       }))
     })
@@ -1040,9 +1116,57 @@ function App() {
       setData((prev) => ({
         ...prev,
         brainDumpInput: '',
-        sortedBrainDump: emptyBrainDump(),
+        brainDumpItems: [],
       }))
+      setBrainDumpReviewing(false)
     })
+  }
+
+  const startBrainDumpTriage = () => {
+    // Parse free-form text: handle newlines, bullet lists, and sentence boundaries
+    const raw = data.brainDumpInput
+    const segments = raw.split('\n').map((l) => l.trim()).filter(Boolean)
+
+    const items: string[] = []
+    for (const seg of segments) {
+      // Strip common list markers: "- ", "* ", "• ", "1. ", "2) " etc.
+      const stripped = seg.replace(/^[-*•]\s+/, '').replace(/^\d+[.)]\s+/, '')
+      // Split on sentence boundaries (. ! ? followed by a space and a letter)
+      // This avoids splitting "e.g. " or "..." unnecessarily
+      const sentences = stripped
+        .split(/[.!?]\s+(?=[^\s])/)
+        .map((s) => s.replace(/[.!?,;]+$/, '').trim())
+        .filter((s) => s.length > 1)
+      items.push(...(sentences.length > 1 ? sentences : [stripped.replace(/[.!?,;]+$/, '').trim()].filter((s) => s.length > 1)))
+    }
+
+    setData((prev) => ({
+      ...prev,
+      brainDumpItems: items.map((text) => ({
+        id: `${Date.now()}-${Math.random()}`,
+        text,
+        triage: null,
+      })),
+    }))
+    setBrainDumpReviewing(true)
+  }
+
+  const confirmBrainDumpReview = () => setBrainDumpReviewing(false)
+
+  const removeBrainDumpReviewItem = (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      brainDumpItems: prev.brainDumpItems.filter((item) => item.id !== id),
+    }))
+  }
+
+  const triageItem = (id: string, triage: 'today' | 'later' | 'release') => {
+    setData((prev) => ({
+      ...prev,
+      brainDumpItems: prev.brainDumpItems.map((item) =>
+        item.id === id ? { ...item, triage } : item,
+      ),
+    }))
   }
 
   const resetWeeklyReview = () => {
@@ -1198,14 +1322,13 @@ function App() {
 
       <section className="timer-info" aria-label="Work timer explanation">
         <p>
-          Welcome. This is your Calm Space dashboard, built to reduce overwhelm with clear,
-          supportive tools for planning, focus, check-ins, and gentle end-of-day wrap-up.
+          {preferredName ? `Welcome, ${preferredName}. ` : 'Welcome. '}This is your Calm Space dashboard, built to reduce overwhelm with clear, supportive tools for planning, focus, check-ins, and gentle end-of-day wrap-up.
         </p>
       </section>
 
       {data.isWorking && selfCareReminder ? (
         <section className="self-care-reminder" aria-label="Self-care reminder" role="note">
-          <p className="reminder-text">{selfCareReminder.message}</p>
+          <p className="reminder-text">{selfCareReminderText}</p>
           <div className="reminder-checklist">
             {selfCareReminder.focus === 'food' ? (
               <label className="reminder-item">
@@ -1231,14 +1354,105 @@ function App() {
         </section>
       ) : null}
 
+      {showFutureYouNote ? (
+        <section className="future-note-reminder" aria-label="Note for tomorrow" role="note">
+          <p className="reminder-text">
+            {preferredName ? `${preferredName}, this was your note for today:` : 'This was your note for today:'}
+          </p>
+          <p className="future-note-copy">{data.windDown.notes}</p>
+          <div className="future-note-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() =>
+                setData((prev) => ({
+                  ...prev,
+                  windDown: { ...prev.windDown, noteShown: true },
+                }))
+              }
+            >
+              Got it
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <header className="hero" id="top">
         <div className="hero-glow" aria-hidden="true"></div>
         <img className="brand-logo" src="/calmspace-logo.svg" alt="Calm Space logo" />
-        <p className="eyebrow">Calm Space Toolkit</p>
-        <h1>Simple tools for work and daily life.</h1>
-        <p className="intro">
-          Built for neurodivergent people by neurodivergent people.
-        </p>
+        <div className="hero-layout">
+          <div className="hero-copy">
+            <p className="eyebrow">Calm Space Toolkit</p>
+            <h1>Simple tools for work and daily life.</h1>
+            <p className="intro">
+              Built for neurodivergent people by neurodivergent people.
+            </p>
+
+            <label className="name-card">
+              What should Calm Space call you?
+              <input
+                type="text"
+                placeholder="Optional"
+                value={data.displayName}
+                onChange={(event) =>
+                  setData((prev) => ({
+                    ...prev,
+                    displayName: event.target.value,
+                  }))
+                }
+              />
+            </label>
+
+            <div className="hero-notes" aria-label="Calm Space highlights">
+              <span>Local-first</span>
+              <span>Flexible pacing</span>
+              <span>No sign-up needed</span>
+            </div>
+
+            <div className="hero-actions">
+              <a className="hero-cta btn-primary" href="#task-chunker">
+                Start with task splitter
+              </a>
+              <a className="hero-cta btn-secondary" href="#body-doubling">
+                Begin a focus session
+              </a>
+            </div>
+          </div>
+
+          <aside className="hero-spotlight" aria-label="Today in Calm Space">
+            <p className="hero-spotlight-label">Today in Calm Space</p>
+            <h2>{currentDayMode.title}</h2>
+            <p className="hero-spotlight-copy">{currentDayMode.summary}</p>
+
+            <div className="hero-stat-grid">
+              <article className="hero-stat">
+                <strong>{toolLinks.length}</strong>
+                <span>support tools</span>
+              </article>
+              <article className="hero-stat">
+                <strong>{readyToolCount}</strong>
+                <span>already in use</span>
+              </article>
+              <article className="hero-stat">
+                <strong>{currentDayMode.focus}/{currentDayMode.rest}</strong>
+                <span>focus rhythm</span>
+              </article>
+            </div>
+
+            <div className="hero-progress-card">
+              <div className="hero-progress-head">
+                <span>Page journey</span>
+                <strong>
+                  {activeToolIndex + 1}/{toolLinks.length}
+                </strong>
+              </div>
+              <div className="progress-meter" aria-hidden="true">
+                <span className="progress-fill" style={{ width: `${journeyPercent}%` }}></span>
+              </div>
+              <p className="hero-progress-copy">You are currently around {activeToolLabel}.</p>
+            </div>
+          </aside>
+        </div>
 
         <section className="mode-and-theme" aria-label="Choose your setup for today">
           <div className="mode-picker">
@@ -1283,14 +1497,26 @@ function App() {
       </header>
 
       <nav className="jump-nav" aria-label="Jump to a tool">
-        <p>Jump to a tool:</p>
+        <div className="jump-nav-head">
+          <p>Jump to a tool</p>
+          <span className="jump-status">Now viewing: {activeToolLabel}</span>
+        </div>
         <ul>
           {toolLinks.map((link) => (
             <li key={link.id}>
-              <a href={`#${link.id}`}>{link.label}</a>
+              <a
+                href={`#${link.id}`}
+                className={activeTool === link.id ? 'active-jump-link' : ''}
+                aria-current={activeTool === link.id ? 'location' : undefined}
+              >
+                {link.label}
+              </a>
             </li>
           ))}
         </ul>
+        <div className="jump-progress" aria-hidden="true">
+          <span className="progress-fill" style={{ width: `${journeyPercent}%` }}></span>
+        </div>
       </nav>
 
       <main id="main-content" className="tool-stack">
@@ -1300,6 +1526,7 @@ function App() {
             title="Task splitter"
             copy="Paste a big task and get a short list of small steps."
             icon="chunker"
+            category="Plan"
           />
 
           {toolTips['task-chunker'] ? (
@@ -1325,6 +1552,7 @@ function App() {
 
           <button
             type="button"
+            className="btn-primary"
             disabled={!hasTaskChunkerContent}
             onClick={() =>
               setData((prev) => ({
@@ -1357,6 +1585,7 @@ function App() {
             title="Body doubling timer"
             copy="Set a timer and work alongside a calm visual companion."
             icon="double"
+            category="Focus"
           />
 
           {toolTips['body-doubling'] ? (
@@ -1415,7 +1644,7 @@ function App() {
           </div>
 
           <div className="button-row">
-            <button type="button" onClick={() => setBodyDoubleRunning(true)}>
+            <button type="button" className="btn-primary" onClick={() => setBodyDoubleRunning(true)}>
               Start
             </button>
             <button type="button" onClick={() => setBodyDoubleRunning(false)}>
@@ -1433,6 +1662,7 @@ function App() {
             title="Pick my next task"
             copy="Add tasks, then pick one next action."
             icon="next"
+            category="Plan"
           />
 
           {toolTips['next-task'] ? (
@@ -1461,16 +1691,16 @@ function App() {
                 }
               />
             </label>
-            <button type="button" disabled={!canAddTask} onClick={addTask}>
+            <button type="button" className="btn-secondary" disabled={!canAddTask} onClick={addTask}>
               Add task
             </button>
           </div>
 
           <div className="button-row">
-            <button type="button" disabled={!hasOpenTasks} onClick={pickNextTask}>
+            <button type="button" className="btn-primary" disabled={!hasOpenTasks} onClick={pickNextTask}>
               Pick my next task
             </button>
-            <button type="button" disabled={!hasCompletedTasks} onClick={clearDoneTasks}>
+            <button type="button" className="btn-secondary" disabled={!hasCompletedTasks} onClick={clearDoneTasks}>
               Clear completed
             </button>
           </div>
@@ -1505,6 +1735,8 @@ function App() {
             <p className="empty-state">Add a few tasks, then let this tool pick one for you.</p>
           )}
 
+          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
+
           <button type="button" className="btn-clear" disabled={!hasNextTaskContent} onClick={resetNextTask}>
             Reset tool
           </button>
@@ -1516,6 +1748,7 @@ function App() {
             title="Transition helper"
             copy="A tiny checklist to switch tasks without losing your place."
             icon="transition"
+            category="Switch"
           />
 
           {toolTips['transition-helper'] ? (
@@ -1633,6 +1866,7 @@ function App() {
             title="Stuck rescue"
             copy="When you freeze, choose one tiny move and commit for 10 minutes."
             icon="rescue"
+            category="Recover"
           />
 
           {toolTips['stuck-rescue'] ? (
@@ -1660,7 +1894,7 @@ function App() {
           </label>
 
           <div className="button-row">
-            <button type="button" onClick={chooseRescueAction}>
+            <button type="button" className="btn-primary" onClick={chooseRescueAction}>
               Pick one tiny move
             </button>
             <button
@@ -1680,10 +1914,12 @@ function App() {
 
           {data.stuckRescue.chosenAction ? (
             <p className="next-task" aria-live="polite">
-              Do this now: {data.stuckRescue.chosenAction}
+              Try this: {data.stuckRescue.chosenAction}
             </p>
           ) : (
-            <p className="empty-state">Press the button to get a tiny action.</p>
+            <p className="empty-state">
+              Add what you are stuck on, then press the button to get a more relevant next step.
+            </p>
           )}
 
           {data.stuckRescue.startedAt ? (
@@ -1703,6 +1939,7 @@ function App() {
             title="Time anchor"
             copy="Gentle local-time nudges while you work so hours do not disappear."
             icon="anchor"
+            category="Focus"
           />
 
           {toolTips['time-anchor'] ? (
@@ -1753,7 +1990,9 @@ function App() {
               {data.timeAnchor.lastPromptText}
             </p>
           ) : (
-            <p className="empty-state">Start your day timer to begin gentle time check-ins.</p>
+            <p className="empty-state">
+              Start your day timer and add your current task for more relevant time check-ins.
+            </p>
           )}
 
           <button type="button" className="btn-clear" disabled={!hasAnchorContent} onClick={resetTimeAnchor}>
@@ -1767,6 +2006,7 @@ function App() {
             title="Track invoices you sent"
             copy="Log who you billed, how much, and whether it has been paid yet."
             icon="money"
+            category="Admin"
           />
 
           {toolTips['money-tracker'] ? (
@@ -1818,7 +2058,7 @@ function App() {
             </label>
           </div>
 
-          <button type="button" disabled={!canAddInvoice} onClick={addInvoice}>
+          <button type="button" className="btn-primary" disabled={!canAddInvoice} onClick={addInvoice}>
             Save entry
           </button>
 
@@ -1827,6 +2067,10 @@ function App() {
             <p>Paid: {formatCurrency(totals.paid)}</p>
             <p>Outstanding: {formatCurrency(totals.outstanding)}</p>
           </div>
+
+          <p className="meta-line">
+            Saved on this device in this browser. If you clear browser data or switch devices, it will not come with you.
+          </p>
 
           {data.invoices.length > 0 ? (
             <ul className="invoice-list">
@@ -1877,9 +2121,10 @@ function App() {
         <section id="brain-dump" className="tool-panel fade-in" aria-labelledby="brain-dump-heading">
           <ToolHeading
             id="brain-dump-heading"
-            title="Brain dump and auto-sort"
-            copy="Write everything down, then sort it in one click."
+            title="Brain dump"
+            copy="Get it all out. Then decide what to do with each thought."
             icon="dump"
+            category="Clear"
           />
 
           {toolTips['brain-dump'] ? (
@@ -1891,50 +2136,150 @@ function App() {
             </div>
           ) : null}
 
-          <label>
-            Brain dump
-            <textarea
-              rows={7}
-              placeholder="One thought per line works best."
-              value={data.brainDumpInput}
-              onChange={(event) =>
-                setData((prev) => ({ ...prev, brainDumpInput: event.target.value }))
-              }
-            />
-          </label>
-
-          <button
-            type="button"
-            disabled={data.brainDumpInput.trim().length === 0}
-            onClick={() =>
-              setData((prev) => ({
-                ...prev,
-                sortedBrainDump: sortBrainDump(prev.brainDumpInput),
-              }))
-            }
-          >
-            Sort into categories
-          </button>
-
-          {totalBrainDumpItems > 0 ? (
+          {data.brainDumpItems.length === 0 ? (
+            /* Phase 1 — write freely */
             <>
-              <p className="meta-line">{totalBrainDumpItems} items sorted</p>
-              <div className="sort-grid">
-                {Object.entries(data.sortedBrainDump).map(([group, entries]) => (
-                  <article key={group}>
-                    <h3>{group.charAt(0).toUpperCase() + group.slice(1)}</h3>
-                    <ul>
-                      {entries.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  </article>
+              <label>
+                What&apos;s on your mind?
+                <textarea
+                  rows={7}
+                  placeholder={"Write freely. Sentences, lists, half-thoughts — all fine.\nGet it all out."}
+                  value={data.brainDumpInput}
+                  onChange={(event) =>
+                    setData((prev) => ({ ...prev, brainDumpInput: event.target.value }))
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={data.brainDumpInput.trim().length === 0}
+                onClick={startBrainDumpTriage}
+              >
+                Sort my thoughts
+              </button>
+            </>
+          ) : brainDumpReviewing ? (
+            /* Phase 2 — review parsed items before triaging */
+            <>
+              <p className="meta-line">
+                {data.brainDumpItems.length} thoughts found — tap × to remove anything that landed wrong
+              </p>
+              <ul className="review-list">
+                {data.brainDumpItems.map((item) => (
+                  <li key={item.id} className="review-item">
+                    <span className="review-item-text">{item.text}</span>
+                    <button
+                      type="button"
+                      className="review-remove"
+                      aria-label={`Remove: ${item.text}`}
+                      onClick={() => removeBrainDumpReviewItem(item.id)}
+                    >
+                      ×
+                    </button>
+                  </li>
                 ))}
+              </ul>
+              <div className="button-row">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={data.brainDumpItems.length === 0}
+                  onClick={confirmBrainDumpReview}
+                >
+                  Start sorting
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setData((prev) => ({ ...prev, brainDumpItems: [] }))
+                    setBrainDumpReviewing(false)
+                  }}
+                >
+                  Back to writing
+                </button>
               </div>
             </>
           ) : (
-            <p className="empty-state">Your categorized list will appear here.</p>
+            /* Phase 3 — triage */
+            <>
+              {pendingBrainDumpItems.length > 0 ? (
+                <>
+                  <p className="meta-line">
+                    {pendingBrainDumpItems.length} left to place — do it today, park it, or let it go
+                  </p>
+                  <ul className="triage-list">
+                    {pendingBrainDumpItems.map((item) => (
+                      <li key={item.id} className="triage-item">
+                        <p className="triage-text">{item.text}</p>
+                        <div className="triage-buttons">
+                          <button
+                            type="button"
+                            className="btn-triage btn-triage--today"
+                            onClick={() => triageItem(item.id, 'today')}
+                          >
+                            Do today
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-triage btn-triage--later"
+                            onClick={() => triageItem(item.id, 'later')}
+                          >
+                            Park it
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-triage btn-triage--release"
+                            onClick={() => triageItem(item.id, 'release')}
+                          >
+                            Let it go
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="meta-line">All sorted. Good work.</p>
+              )}
+
+              {todayBrainDumpItems.length > 0 && (
+                <div className="triage-bucket">
+                  <h3 className="triage-bucket-label triage-bucket-label--today">Do today</h3>
+                  <ul className="triage-bucket-list">
+                    {todayBrainDumpItems.map((item) => (
+                      <li key={item.id}>{item.text}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {laterBrainDumpItems.length > 0 && (
+                <div className="triage-bucket">
+                  <h3 className="triage-bucket-label triage-bucket-label--later">Parked</h3>
+                  <ul className="triage-bucket-list">
+                    {laterBrainDumpItems.map((item) => (
+                      <li key={item.id}>{item.text}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {releaseBrainDumpItems.length > 0 && (
+                <div className="triage-bucket">
+                  <h3 className="triage-bucket-label triage-bucket-label--release">Let go</h3>
+                  <ul className="triage-bucket-list">
+                    {releaseBrainDumpItems.map((item) => (
+                      <li key={item.id}>{item.text}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
+
+          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasBrainDumpContent} onClick={resetBrainDump}>
             Reset tool
@@ -1947,6 +2292,7 @@ function App() {
             title="Weekly review prompts"
             copy="Quick prompts to review your week."
             icon="review"
+            category="Reflect"
           />
 
           {toolTips['weekly-review'] ? (
@@ -2030,6 +2376,8 @@ function App() {
             />
           </label>
 
+          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
+
           <button type="button" className="btn-clear" disabled={!hasWeeklyReviewContent} onClick={resetWeeklyReview}>
             Reset tool
           </button>
@@ -2041,6 +2389,7 @@ function App() {
             title="Flexible pomodoro"
             copy="Focus timer with adjustable rest."
             icon="pomo"
+            category="Focus"
           />
 
           {toolTips.pomodoro ? (
@@ -2101,7 +2450,7 @@ function App() {
           </p>
 
           <div className="button-row">
-            <button type="button" onClick={() => setPomodoroRunning(true)}>
+            <button type="button" className="btn-primary" onClick={() => setPomodoroRunning(true)}>
               Start
             </button>
             <button type="button" onClick={() => setPomodoroRunning(false)}>
@@ -2138,6 +2487,7 @@ function App() {
             title="Body check-in"
             copy="A quick place to keep track of water, food, and posture through the day."
             icon="selfcare"
+            category="Care"
           />
 
           {toolTips['self-care'] ? (
@@ -2195,6 +2545,7 @@ function App() {
             title="End-of-day wind-down"
             copy="A short checklist to close your workday."
             icon="winddown"
+            category="Close"
           />
 
           {toolTips['wind-down'] ? (
@@ -2224,6 +2575,7 @@ function App() {
             </label>
             <button
               type="button"
+              className="btn-secondary"
               onClick={(event) => {
                 const field = event.currentTarget.previousElementSibling?.querySelector('input')
                 if (!(field instanceof HTMLInputElement) || !field.value.trim()) {
@@ -2288,7 +2640,7 @@ function App() {
           )}
 
           <label>
-            Message to future-you
+            Message for tomorrow
             <textarea
               rows={3}
               placeholder="Example: Start with invoice before opening chat."
@@ -2296,11 +2648,19 @@ function App() {
               onChange={(event) =>
                 setData((prev) => ({
                   ...prev,
-                  windDown: { ...prev.windDown, notes: event.target.value },
+                  windDown: {
+                    ...prev.windDown,
+                    notes: event.target.value,
+                    noteWrittenDate:
+                      event.target.value.trim().length > 0 ? todayDateKey : null,
+                    noteShown: false,
+                  },
                 }))
               }
             />
           </label>
+
+          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasWindDownContent} onClick={resetWindDown}>
             Reset tool
@@ -2308,17 +2668,36 @@ function App() {
         </section>
       </main>
 
-      <section className="support-note" aria-label="Support this project">
-        <h2>Support This Project</h2>
-        <p>
-          If this toolkit helps you, you can support it on Ko-fi. Donations help cover hosting,
-          updates, and new tools. No pressure at all. Use it freely either way.
-        </p>
-        <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
-          Support on Ko-fi
-        </a>
-        <p className="site-credit">Built by loismakeswebsites</p>
-      </section>
+      <div className="page-ending">
+        <section className="support-note" aria-label="Support this project">
+          <p className="tool-category">Support</p>
+          <h2>Keep Calm Space growing</h2>
+          <p>
+            If this toolkit helps you, you can support it on Ko-fi. Donations help cover hosting,
+            updates, and new tools. No pressure at all. Use it freely either way.
+          </p>
+          <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
+            Support on Ko-fi
+          </a>
+        </section>
+
+        <footer className="site-footer" aria-label="Site footer">
+          <div>
+            <p className="footer-kicker">Calm Space</p>
+            <p className="footer-note">
+              Calm Space keeps your data in this browser unless you choose to share it.
+            </p>
+          </div>
+          <div className="footer-links">
+            <a href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
+              Support on Ko-fi
+            </a>
+            <a href="https://loismakeswebsites.co.uk" target="_blank" rel="noreferrer">
+              Built by loismakeswebsites
+            </a>
+          </div>
+        </footer>
+      </div>
     </div>
   )
 }
