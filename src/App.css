@@ -33,7 +33,7 @@
   box-shadow: 0 8px 20px rgba(35, 38, 32, 0.05);
 }
 
-.start-here,
+.how-it-works,
 .work-boundary {
   margin-top: 1rem;
   border: 1px solid var(--line-soft);
@@ -42,36 +42,43 @@
   padding: 0.95rem 1.1rem;
 }
 
-.start-here h2,
+.how-it-works h2,
 .work-boundary h2 {
   margin: 0;
   font-size: clamp(1.2rem, 2.5vw, 1.5rem);
 }
 
-.start-here p,
 .work-boundary-copy {
   margin: 0.55rem 0 0;
   color: var(--ink-soft);
   line-height: 1.5;
 }
 
-.start-here ol {
-  margin: 0.6rem 0 0;
-  padding-left: 1.1rem;
-  color: var(--ink-soft);
+.how-it-works ol {
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
   display: grid;
-  gap: 0.28rem;
+  gap: 0.55rem;
 }
 
-.start-here-actions {
-  margin-top: 0.75rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+.how-it-works li {
+  padding: 0.65rem 0.72rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--panel-bg) 92%, white 8%);
 }
 
-.start-here-actions a {
-  text-decoration: none;
+.how-it-works li strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.how-it-works li span {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
 }
 
 .work-boundary .work-timer-bar {
@@ -213,48 +220,51 @@ button:disabled:hover {
   color: var(--ink-soft);
 }
 
-.self-care-reminder {
-  margin-bottom: 1.1rem;
-  padding: 1rem 1.25rem;
-  border-left: 3px solid var(--accent-strong);
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--accent-strong) 8%, var(--panel-bg) 92%);
-  animation: fadeIn 0.3s ease;
+.self-care-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, rgba(21, 24, 18, 0.46) 80%, transparent 20%);
+  backdrop-filter: blur(3px);
 }
 
-.reminder-text {
-  margin: 0 0 0.8rem 0;
-  font-size: 0.95rem;
-  font-weight: 600;
+.self-care-modal {
+  width: min(520px, 100%);
+  border: 1px solid var(--line-soft);
+  border-radius: 1rem;
+  background: var(--panel-bg);
+  box-shadow: 0 20px 48px rgba(21, 24, 18, 0.24);
+  padding: 1rem 1.1rem;
+}
+
+.self-care-modal-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
   color: var(--accent-strong);
 }
 
-.reminder-checklist {
-  display: flex;
-  gap: 0.6rem;
+.self-care-modal-text {
+  margin: 0.45rem 0 0;
+  font-size: 1.02rem;
+  color: var(--ink-strong);
 }
 
-.reminder-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.8rem;
-  background: var(--action-soft);
-  border: 1px solid var(--line-soft);
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: all 0.18s ease;
+.self-care-modal-note {
+  margin: 0.45rem 0 0;
+  color: var(--ink-soft);
+  line-height: 1.5;
   font-size: 0.9rem;
 }
 
-.reminder-item:hover {
-  background: var(--action-soft-hover);
-  border-color: var(--line-strong);
-}
-
-.reminder-item input {
-  cursor: pointer;
-  accent-color: var(--accent-strong);
+.self-care-modal-actions {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .future-note-reminder {
@@ -387,9 +397,27 @@ button:disabled:hover {
   gap: 0.85rem;
 }
 
+.setup-details {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.setup-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.setup-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
 .mode-picker p,
 .theme-picker p,
-.tool-set-picker p {
+.tool-set-picker p,
+.view-picker p {
   margin: 0 0 0.45rem;
   color: var(--ink-muted);
   font-size: 0.92rem;
@@ -511,6 +539,16 @@ button:disabled:hover {
   color: var(--ink-muted);
 }
 
+.single-tool-reassure {
+  margin: 0 0 0.55rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 22%, var(--line-soft) 78%);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--accent-soft) 30%, var(--panel-bg) 70%);
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
 .jump-status {
   font-size: 0.83rem;
   color: var(--ink-muted);
@@ -526,7 +564,9 @@ button:disabled:hover {
 }
 
 .jump-nav a {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   text-decoration: none;
   border: 1px solid var(--line-soft);
   border-radius: 999px;
@@ -537,7 +577,26 @@ button:disabled:hover {
   transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
+.jump-tool-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-bg) 92%, white 8%);
+  padding: 0.42rem 0.72rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+
 .jump-nav a:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.jump-tool-button:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -548,11 +607,31 @@ button:disabled:hover {
   border-color: color-mix(in srgb, var(--accent-strong) 30%, var(--line-soft) 70%);
 }
 
+.jump-tool-button:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--panel-bg) 55%);
+  border-color: color-mix(in srgb, var(--accent-strong) 30%, var(--line-soft) 70%);
+}
+
 .jump-nav a.active-jump-link {
   background: color-mix(in srgb, var(--accent-soft) 62%, white 38%);
   border-color: color-mix(in srgb, var(--accent-strong) 48%, var(--line-soft) 52%);
   color: var(--accent-strong);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-strong) 16%, transparent 84%);
+}
+
+.jump-tool-button.active-jump-link {
+  background: color-mix(in srgb, var(--accent-soft) 62%, white 38%);
+  border-color: color-mix(in srgb, var(--accent-strong) 48%, var(--line-soft) 52%);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-strong) 16%, transparent 84%);
+}
+
+.single-tool-controls {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .tool-stack {
@@ -683,6 +762,7 @@ button:disabled:hover {
   display: flex;
   gap: 0.55rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .tool-icon-wrap {
@@ -713,6 +793,18 @@ button:disabled:hover {
   margin: 0.5rem 0 1.05rem;
   color: var(--ink-soft);
   max-width: 70ch;
+}
+
+.panel-collapse-toggle {
+  margin-top: 0.3rem;
+}
+
+.tool-panel.collapsed-panel {
+  padding-bottom: 1rem;
+}
+
+.tool-panel.collapsed-panel > :not(.panel-head) {
+  display: none;
 }
 
 label {
@@ -1603,7 +1695,19 @@ button:hover {
   color: var(--ink-soft);
 }
 
+:root[data-theme='night'] .jump-tool-button {
+  background: color-mix(in srgb, var(--panel-bg) 88%, black 12%);
+  border-color: var(--line-strong);
+  color: var(--ink-soft);
+}
+
 :root[data-theme='night'] .jump-nav a.active-jump-link {
+  background: color-mix(in srgb, #7d9fd9 20%, var(--panel-bg) 80%);
+  border-color: color-mix(in srgb, #7d9fd9 48%, var(--line-strong) 52%);
+  color: #cfe0fb;
+}
+
+:root[data-theme='night'] .jump-tool-button.active-jump-link {
   background: color-mix(in srgb, #7d9fd9 20%, var(--panel-bg) 80%);
   border-color: color-mix(in srgb, #7d9fd9 48%, var(--line-strong) 52%);
   color: #cfe0fb;
@@ -1831,9 +1935,9 @@ button:hover {
   color: var(--ink-soft);
 }
 
-:root[data-theme='night'] .self-care-reminder {
-  border-left-color: #7d9fd9;
-  background: color-mix(in srgb, #3d4c64 50%, #2a303a 50%);
+:root[data-theme='night'] .self-care-modal {
+  border-color: var(--line-strong);
+  background: color-mix(in srgb, var(--panel-bg) 94%, black 6%);
 }
 
 :root[data-theme='night'] .future-note-reminder {
@@ -1851,18 +1955,12 @@ button:hover {
   background: color-mix(in srgb, var(--panel-bg) 92%, black 8%);
 }
 
-:root[data-theme='night'] .reminder-text {
+:root[data-theme='night'] .self-care-modal-title {
   color: #a4c3e8;
 }
 
-:root[data-theme='night'] .reminder-item {
-  background: color-mix(in srgb, #3d4c64 60%, #364253 40%);
-  border-color: color-mix(in srgb, #7d9fd9 20%, #4d5a6d 80%);
-}
-
-:root[data-theme='night'] .reminder-item:hover {
-  background: color-mix(in srgb, #3d4c64 70%, #364253 30%);
-  border-color: color-mix(in srgb, #7d9fd9 35%, #4d5a6d 65%);
+:root[data-theme='night'] .self-care-modal-note {
+  color: var(--ink-soft);
 }
 
 @media (max-width: 900px) {
@@ -1919,15 +2017,9 @@ button:hover {
     gap: 0.8rem;
   }
 
-  .start-here,
+  .how-it-works,
   .work-boundary {
     padding: 0.85rem 0.95rem;
-  }
-
-  .start-here-actions a {
-    flex: 1;
-    min-width: 220px;
-    text-align: center;
   }
 
   .jump-nav ul {
@@ -1935,6 +2027,12 @@ button:hover {
   }
 
   .jump-nav a {
+    min-height: 2.35rem;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .jump-tool-button {
     min-height: 2.35rem;
     display: inline-flex;
     align-items: center;
@@ -1954,23 +2052,13 @@ button:hover {
     min-width: 80px;
   }
 
-  .self-care-reminder {
-    margin-bottom: 1.2rem;
-    padding: 0.8rem 1rem;
+  .self-care-modal {
+    padding: 0.9rem 0.95rem;
   }
 
   .future-note-reminder {
     margin-bottom: 1.2rem;
     padding: 0.8rem 1rem;
-  }
-
-  .reminder-checklist {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .reminder-item {
-    width: 100%;
   }
 
   .site-footer {
@@ -1995,9 +2083,8 @@ button:hover {
 
   .work-timer-bar,
   .timer-info,
-  .self-care-reminder,
   .future-note-reminder,
-  .start-here,
+  .how-it-works,
   .work-boundary {
     border-radius: 0.9rem;
   }
@@ -2040,6 +2127,12 @@ button:hover {
   }
 
   .jump-nav a {
+    font-size: 0.82rem;
+    padding: 0.36rem 0.62rem;
+    min-height: 2.1rem;
+  }
+
+  .jump-tool-button {
     font-size: 0.82rem;
     padding: 0.36rem 0.62rem;
     min-height: 2.1rem;
@@ -2093,12 +2186,11 @@ button:hover {
   .button-row button,
   .inline-input button,
   .hero-cta,
-  .future-note-actions button,
-  .start-here-actions a {
+  .future-note-actions button {
     min-height: 2.8rem;
   }
 
-  .start-here ol {
+  .how-it-works ol {
     gap: 0.35rem;
   }
 
@@ -2164,6 +2256,11 @@ button:hover {
     font-size: 0.78rem;
     padding: 0.34rem 0.56rem;
   }
+
+  .jump-tool-button {
+    font-size: 0.78rem;
+    padding: 0.34rem 0.56rem;
+  }
 }
 
 @media (max-height: 760px) and (orientation: landscape) {
@@ -2193,6 +2290,7 @@ button:hover {
   .tool-panel,
   .hero-cta,
   .jump-nav a,
+  .jump-tool-button,
   button,
   .footer-links a {
     transition: none;

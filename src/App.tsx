@@ -51,6 +51,8 @@ type SelfCare = {
   posture: boolean
   lastFoodCheck: number | null
   lastWaterCheck: number | null
+  foodReminderSnoozeUntil: number | null
+  waterReminderSnoozeUntil: number | null
   lastReset: number
 }
 
@@ -116,6 +118,7 @@ type ProfileData = {
 type TipsState = Record<string, boolean>
 type DayMode = 'gentle' | 'focus' | 'recovery'
 type ThemeName = 'dawn' | 'moss' | 'ocean' | 'night'
+type ToolView = 'all' | 'single'
 
 type ToolId =
   | 'task-chunker'
@@ -149,6 +152,8 @@ const STORAGE_PREFIX = 'calm-space'
 const THEME_KEY = `${STORAGE_PREFIX}:theme`
 const DAY_MODE_KEY = `${STORAGE_PREFIX}:day-mode`
 const ESSENTIALS_ONLY_KEY = `${STORAGE_PREFIX}:essentials-only`
+const TOOL_VIEW_KEY = `${STORAGE_PREFIX}:tool-view`
+const SINGLE_TOOL_KEY = `${STORAGE_PREFIX}:single-tool`
 
 const toolLinks: Array<{ id: ToolId; label: string }> = [
   { id: 'task-chunker', label: 'Task Splitter' },
@@ -164,6 +169,21 @@ const toolLinks: Array<{ id: ToolId; label: string }> = [
   { id: 'self-care', label: 'Body Check' },
   { id: 'wind-down', label: 'Wind-down' },
 ]
+
+const defaultCollapsedTools = (): Record<ToolId, boolean> => ({
+  'task-chunker': true,
+  'body-doubling': true,
+  'next-task': false,
+  'transition-helper': true,
+  'stuck-rescue': true,
+  'time-anchor': true,
+  'money-tracker': true,
+  'brain-dump': true,
+  'weekly-review': true,
+  pomodoro: true,
+  'self-care': true,
+  'wind-down': true,
+})
 
 const essentialToolIds: ToolId[] = [
   'task-chunker',
@@ -299,6 +319,8 @@ const defaultData = (): ProfileData => ({
     posture: false,
     lastFoodCheck: null,
     lastWaterCheck: null,
+    foodReminderSnoozeUntil: null,
+    waterReminderSnoozeUntil: null,
     lastReset: Date.now(),
   },
 })
@@ -334,12 +356,61 @@ const loadStoredDayMode = (): DayMode => {
 
 const loadStoredEssentialsOnly = (): boolean => {
   try {
-    return localStorage.getItem(ESSENTIALS_ONLY_KEY) === 'true'
+    const raw = localStorage.getItem(ESSENTIALS_ONLY_KEY)
+    if (raw === null) {
+      return true
+    }
+
+    return raw === 'true'
   } catch {
     // Silently fail
   }
 
-  return false
+  return true
+}
+
+const loadStoredToolView = (): ToolView => {
+  try {
+    const raw = localStorage.getItem(TOOL_VIEW_KEY)
+    if (raw === 'all') {
+      return 'all'
+    }
+
+    return 'single'
+  } catch {
+    // Silently fail
+  }
+
+  return 'single'
+}
+
+const loadStoredSingleTool = (): ToolId => {
+  try {
+    const storedTool = localStorage.getItem(SINGLE_TOOL_KEY)
+    if (storedTool && toolLinks.some((tool) => tool.id === storedTool)) {
+      return storedTool as ToolId
+    }
+  } catch {
+    // Silently fail
+  }
+
+  return 'next-task'
+}
+
+const getToolViewFromUrl = (): { view: ToolView | null; tool: ToolId | null } => {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const viewParam = params.get('view')
+    const toolParam = params.get('tool')
+    const view = viewParam === 'single' ? 'single' : null
+    const tool = toolParam && toolLinks.some((item) => item.id === toolParam)
+      ? (toolParam as ToolId)
+      : null
+
+    return { view, tool }
+  } catch {
+    return { view: null, tool: null }
+  }
 }
 
 const loadStoredProfile = (profileId: string) => {
@@ -489,17 +560,25 @@ function ToolIcon({ name }: { name: ToolIconName }) {
 }
 
 function ToolHeading({
+  toolId,
   id,
   title,
   copy,
   icon,
   category,
+  showCollapseToggle,
+  isCollapsed,
+  onToggleCollapse,
 }: {
+  toolId: ToolId
   id: string
   title: string
   copy: string
   icon: ToolIconName
   category: string
+  showCollapseToggle?: boolean
+  isCollapsed?: boolean
+  onToggleCollapse?: () => void
 }) {
   return (
     <div className="panel-head">
@@ -511,6 +590,17 @@ function ToolHeading({
         <h2 id={id}>{title}</h2>
       </div>
       <p>{copy}</p>
+      {showCollapseToggle && onToggleCollapse ? (
+        <button
+          type="button"
+          className="panel-collapse-toggle btn-secondary"
+          onClick={onToggleCollapse}
+          aria-expanded={!isCollapsed}
+          aria-controls={toolId}
+        >
+          {isCollapsed ? 'Show details' : 'Hide details'}
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -530,7 +620,11 @@ function App() {
   const [stuckRescueSecondsLeft, setStuckRescueSecondsLeft] = useState(0)
   const [activeTool, setActiveTool] = useState<ToolId>('task-chunker')
   const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
+  const [selfCareModalFocus, setSelfCareModalFocus] = useState<'food' | 'water' | null>(null)
   const [essentialsOnly, setEssentialsOnly] = useState<boolean>(() => loadStoredEssentialsOnly())
+  const [toolView, setToolView] = useState<ToolView>(() => loadStoredToolView())
+  const [singleToolId, setSingleToolId] = useState<ToolId>(() => loadStoredSingleTool())
+  const [collapsedTools, setCollapsedTools] = useState<Record<ToolId, boolean>>(() => defaultCollapsedTools())
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -549,6 +643,43 @@ function App() {
     }
   }, [essentialsOnly])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(TOOL_VIEW_KEY, toolView)
+      localStorage.setItem(SINGLE_TOOL_KEY, singleToolId)
+    } catch {
+      // Silently fail if storage is unavailable
+    }
+  }, [toolView, singleToolId])
+
+  useEffect(() => {
+    const fromUrl = getToolViewFromUrl()
+    if (fromUrl.tool) {
+      setSingleToolId(fromUrl.tool)
+    }
+    if (fromUrl.view === 'single') {
+      setToolView('single')
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href)
+      if (toolView === 'single') {
+        url.searchParams.set('view', 'single')
+        url.searchParams.set('tool', singleToolId)
+      } else {
+        url.searchParams.delete('view')
+        url.searchParams.delete('tool')
+      }
+
+      const nextUrl = `${url.pathname}${url.search}${url.hash}`
+      window.history.replaceState(null, '', nextUrl)
+    } catch {
+      // Silently fail
+    }
+  }, [toolView, singleToolId])
+
   const visibleToolLinks = useMemo(
     () =>
       essentialsOnly
@@ -558,6 +689,31 @@ function App() {
   )
 
   const isToolVisible = (toolId: ToolId) => !essentialsOnly || essentialToolIds.includes(toolId)
+  const isToolVisibleInLayout =
+    (toolId: ToolId) => isToolVisible(toolId) && (toolView === 'all' || singleToolId === toolId)
+
+  const isCollapsedInAllView = (toolId: ToolId) => toolView === 'all' && collapsedTools[toolId]
+
+  const getToolPanelClass = (toolId: ToolId) =>
+    `tool-panel fade-in ${isToolVisibleInLayout(toolId) ? '' : 'tool-hidden'} ${isCollapsedInAllView(toolId) ? 'collapsed-panel' : ''}`
+
+  const toggleToolCollapsed = (toolId: ToolId) => {
+    setCollapsedTools((prev) => ({ ...prev, [toolId]: !prev[toolId] }))
+  }
+
+  const getHeadingControls = (toolId: ToolId) => ({
+    toolId,
+    showCollapseToggle: toolView === 'all',
+    isCollapsed: collapsedTools[toolId],
+    onToggleCollapse: () => toggleToolCollapsed(toolId),
+  })
+
+  const openSingleTool = (toolId: ToolId) => {
+    setSingleToolId(toolId)
+    setActiveTool(toolId)
+    setToolView('single')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   useEffect(() => {
     try {
@@ -720,6 +876,12 @@ function App() {
     }
   }, [visibleToolLinks, activeTool])
 
+  useEffect(() => {
+    if (toolView === 'single' && !visibleToolLinks.some((tool) => tool.id === singleToolId)) {
+      setSingleToolId(visibleToolLinks[0]?.id ?? 'task-chunker')
+    }
+  }, [toolView, visibleToolLinks, singleToolId])
+
   const currentDayMode = useMemo(
     () => dayModes.find((item) => item.id === dayMode) ?? dayModes[0],
     [dayMode],
@@ -780,12 +942,37 @@ function App() {
   })
   const todayDateKey = new Date().toISOString().slice(0, 10)
   const preferredName = data.displayName.trim()
-  const selfCareReminderText = selfCareReminder
-    ? preferredName
-      ? `${preferredName}, ${lowercaseFirst(selfCareReminder.message)}`
-      : selfCareReminder.message
-    : ''
+  const reminderSnoozeUntil = selfCareReminder
+    ? selfCareReminder.focus === 'food'
+      ? data.selfCare.foodReminderSnoozeUntil
+      : data.selfCare.waterReminderSnoozeUntil
+    : null
+  const isSelfCareReminderDue =
+    Boolean(data.isWorking && selfCareReminder) &&
+    (!reminderSnoozeUntil || Date.now() >= reminderSnoozeUntil)
+  const selfCareModalText =
+    selfCareModalFocus === 'food'
+      ? 'Quick check-in. Have you had something to eat?'
+      : 'Quick check-in. Have you had some water recently?'
   const selfCareStatus = formatLastCheck(data.selfCare.lastReset)
+
+  useEffect(() => {
+    if (!data.isWorking || !selfCareReminder) {
+      setSelfCareModalFocus(null)
+      return
+    }
+
+    if (isSelfCareReminderDue) {
+      setSelfCareModalFocus(selfCareReminder.focus)
+    }
+  }, [
+    data.isWorking,
+    selfCareReminder?.focus,
+    isSelfCareReminderDue,
+    workElapsedSeconds,
+    breakElapsedSeconds,
+  ])
+
   const noteWrittenDate = data.windDown.noteWrittenDate
   const showFutureYouNote = noteWrittenDate
     ? data.windDown.notes.trim().length > 0 &&
@@ -834,13 +1021,17 @@ function App() {
     data.timeAnchor.taskLabel.trim().length > 0 ||
     data.timeAnchor.lastPromptAt !== null ||
     data.timeAnchor.lastPromptText.trim().length > 0
+  const currentToolId = toolView === 'single' ? singleToolId : activeTool
   const activeToolLabel =
-    visibleToolLinks.find((link) => link.id === activeTool)?.label ?? visibleToolLinks[0].label
+    visibleToolLinks.find((link) => link.id === currentToolId)?.label ?? visibleToolLinks[0].label
   const activeToolIndex = Math.max(
     0,
-    visibleToolLinks.findIndex((link) => link.id === activeTool),
+    visibleToolLinks.findIndex((link) => link.id === currentToolId),
   )
   const journeyPercent = ((activeToolIndex + 1) / Math.max(1, visibleToolLinks.length)) * 100
+  const prevToolId = activeToolIndex > 0 ? visibleToolLinks[activeToolIndex - 1].id : null
+  const nextToolId =
+    activeToolIndex < visibleToolLinks.length - 1 ? visibleToolLinks[activeToolIndex + 1].id : null
   const confirmReset = (message: string, hasContent: boolean, action: () => void) => {
     if (!hasContent) {
       return
@@ -1238,6 +1429,8 @@ function App() {
         [field]: !prev.selfCare[field],
         ...(field === 'food' && !prev.selfCare.food ? { lastFoodCheck: now } : {}),
         ...(field === 'water' && !prev.selfCare.water ? { lastWaterCheck: now } : {}),
+        ...(field === 'food' ? { foodReminderSnoozeUntil: null } : {}),
+        ...(field === 'water' ? { waterReminderSnoozeUntil: null } : {}),
         lastReset: now,
       },
     }))
@@ -1251,11 +1444,30 @@ function App() {
       selfCare: {
         ...prev.selfCare,
         [focus]: true,
-        ...(focus === 'food' ? { lastFoodCheck: now } : {}),
-        ...(focus === 'water' ? { lastWaterCheck: now } : {}),
+        ...(focus === 'food'
+          ? { lastFoodCheck: now, foodReminderSnoozeUntil: null }
+          : { lastWaterCheck: now, waterReminderSnoozeUntil: null }),
         lastReset: now,
       },
     }))
+    setSelfCareModalFocus(null)
+  }
+
+  const snoozeSelfCareReminder = (focus: 'food' | 'water') => {
+    const now = Date.now()
+    const snoozeUntil = now + 30 * 60 * 1000
+
+    setData((prev) => ({
+      ...prev,
+      selfCare: {
+        ...prev.selfCare,
+        ...(focus === 'food'
+          ? { foodReminderSnoozeUntil: snoozeUntil }
+          : { waterReminderSnoozeUntil: snoozeUntil }),
+        lastReset: now,
+      },
+    }))
+    setSelfCareModalFocus(null)
   }
 
   const resetSelfCare = () => {
@@ -1268,10 +1480,13 @@ function App() {
           posture: false,
           lastFoodCheck: null,
           lastWaterCheck: null,
+          foodReminderSnoozeUntil: null,
+          waterReminderSnoozeUntil: null,
           lastReset: Date.now(),
         },
       }))
     })
+    setSelfCareModalFocus(null)
   }
 
   const dismissTip = (id: ToolId) => {
@@ -1290,32 +1505,44 @@ function App() {
         </p>
       </section>
 
-      {data.isWorking && selfCareReminder ? (
-        <section className="self-care-reminder" aria-label="Self-care reminder" role="note">
-          <p className="reminder-text">{selfCareReminderText}</p>
-          <div className="reminder-checklist">
-            {selfCareReminder.focus === 'food' ? (
-              <label className="reminder-item">
-                <input
-                  type="checkbox"
-                  checked={false}
-                  onChange={() => completeSelfCareReminder('food')}
-                />
-                <span>Food</span>
-              </label>
-            ) : null}
-            {selfCareReminder.focus === 'water' ? (
-              <label className="reminder-item">
-                <input
-                  type="checkbox"
-                  checked={false}
-                  onChange={() => completeSelfCareReminder('water')}
-                />
-                <span>Water</span>
-              </label>
-            ) : null}
-          </div>
-        </section>
+      {selfCareModalFocus && isSelfCareReminderDue ? (
+        <div className="self-care-modal-overlay" role="presentation">
+          <section className="self-care-modal" role="dialog" aria-modal="true" aria-label="Self-care check-in">
+            <p className="self-care-modal-title">
+              {preferredName ? `${preferredName}, a gentle check-in` : 'A gentle check-in'}
+            </p>
+            <p className="self-care-modal-text">{selfCareModalText}</p>
+            <p className="self-care-modal-note">
+              {selfCareModalFocus === 'food'
+                ? 'If not yet, that is okay. I will check again in about 30 minutes.'
+                : 'If not yet, that is okay. I will check again in about 30 minutes while you are working.'}
+            </p>
+            <div className="self-care-modal-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  if (selfCareModalFocus) {
+                    completeSelfCareReminder(selfCareModalFocus)
+                  }
+                }}
+              >
+                Yes, I have
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  if (selfCareModalFocus) {
+                    snoozeSelfCareReminder(selfCareModalFocus)
+                  }
+                }}
+              >
+                Not yet
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {showFutureYouNote ? (
@@ -1370,91 +1597,120 @@ function App() {
         </div>
 
         <section className="mode-and-theme" aria-label="Choose your setup for today">
-          <div className="mode-picker">
-            <p>Pick your day mode</p>
-            <div className="chip-row">
-              {dayModes.map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  className={`chip ${dayMode === mode.id ? 'active-chip' : ''}`}
-                  onClick={() => applyDayMode(mode.id)}
-                  aria-pressed={dayMode === mode.id}
-                >
-                  <strong>{mode.title}</strong>
-                  <span>{mode.summary}</span>
-                </button>
-              ))}
-            </div>
-            <p className="mode-summary" aria-live="polite">
-              {currentDayMode.title}: body doubling {currentDayMode.bodyDouble} min, pomodoro {currentDayMode.focus}/{currentDayMode.rest} min.
+          <details className="setup-details">
+            <summary>Customise your setup (optional)</summary>
+            <p className="setup-note">
+              Default is <strong>Essentials only</strong> and <strong>One tool at a time</strong>.
+              You can change that here whenever you like.
             </p>
-          </div>
 
-          <div className="theme-picker">
-            <p>Theme</p>
-            <div className="theme-row">
-              {themes.map((themeOption) => (
+            <div className="mode-picker">
+              <p>Pick your day mode</p>
+              <div className="chip-row">
+                {dayModes.map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    className={`chip ${dayMode === mode.id ? 'active-chip' : ''}`}
+                    onClick={() => applyDayMode(mode.id)}
+                    aria-pressed={dayMode === mode.id}
+                  >
+                    <strong>{mode.title}</strong>
+                    <span>{mode.summary}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mode-summary" aria-live="polite">
+                {currentDayMode.title}: body doubling {currentDayMode.bodyDouble} min, pomodoro {currentDayMode.focus}/{currentDayMode.rest} min.
+              </p>
+            </div>
+
+            <div className="theme-picker">
+              <p>Theme</p>
+              <div className="theme-row">
+                {themes.map((themeOption) => (
+                  <button
+                    key={themeOption.id}
+                    type="button"
+                    className={`theme-chip theme-${themeOption.id} ${
+                      theme === themeOption.id ? 'active-theme' : ''
+                    }`}
+                    onClick={() => setTheme(themeOption.id)}
+                    aria-pressed={theme === themeOption.id}
+                  >
+                    {themeOption.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="tool-set-picker">
+              <p>Tool set</p>
+              <div className="chip-row">
                 <button
-                  key={themeOption.id}
                   type="button"
-                  className={`theme-chip theme-${themeOption.id} ${
-                    theme === themeOption.id ? 'active-theme' : ''
-                  }`}
-                  onClick={() => setTheme(themeOption.id)}
-                  aria-pressed={theme === themeOption.id}
+                  className={`chip ${essentialsOnly ? 'active-chip' : ''}`}
+                  onClick={() => setEssentialsOnly(true)}
+                  aria-pressed={essentialsOnly}
                 >
-                  {themeOption.label}
+                  <strong>Essentials only</strong>
+                  <span>Show a smaller set to reduce overwhelm</span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={`chip ${essentialsOnly ? '' : 'active-chip'}`}
+                  onClick={() => setEssentialsOnly(false)}
+                  aria-pressed={!essentialsOnly}
+                >
+                  <strong>All tools</strong>
+                  <span>Show the full toolkit</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="tool-set-picker">
-            <p>Tool set</p>
-            <div className="chip-row">
-              <button
-                type="button"
-                className={`chip ${essentialsOnly ? 'active-chip' : ''}`}
-                onClick={() => setEssentialsOnly(true)}
-                aria-pressed={essentialsOnly}
-              >
-                <strong>Essentials only</strong>
-                <span>Show a smaller set to reduce overwhelm</span>
-              </button>
-              <button
-                type="button"
-                className={`chip ${essentialsOnly ? '' : 'active-chip'}`}
-                onClick={() => setEssentialsOnly(false)}
-                aria-pressed={!essentialsOnly}
-              >
-                <strong>All tools</strong>
-                <span>Show the full toolkit</span>
-              </button>
+            <div className="view-picker">
+              <p>How to view tools</p>
+              <div className="chip-row">
+                <button
+                  type="button"
+                  className={`chip ${toolView === 'all' ? 'active-chip' : ''}`}
+                  onClick={() => setToolView('all')}
+                  aria-pressed={toolView === 'all'}
+                >
+                  <strong>All on one page</strong>
+                  <span>Scroll through the full toolkit</span>
+                </button>
+                <button
+                  type="button"
+                  className={`chip ${toolView === 'single' ? 'active-chip' : ''}`}
+                  onClick={() => openSingleTool(singleToolId)}
+                  aria-pressed={toolView === 'single'}
+                >
+                  <strong>One tool at a time</strong>
+                  <span>Use tools like separate pages</span>
+                </button>
+              </div>
             </div>
-          </div>
+          </details>
         </section>
       </header>
 
-      <section className="start-here" aria-label="How to start">
-        <h2>Start here</h2>
-        <p>
-          If you are not sure where to begin, try this:
-        </p>
+      <section className="how-it-works" aria-label="How this works">
+        <h2>How this works</h2>
         <ol>
-          <li>Pick a <strong>Day mode</strong> that matches your energy.</li>
-          <li>Open <strong>What Next</strong> and choose one small task.</li>
-          <li>Start the <strong>Work boundary tracker</strong> so you do not drift into overtime.</li>
-          <li>Use the jump menu whenever you want to switch tools.</li>
+          <li>
+            <strong>Set up your day</strong>
+            <span>Use the optional setup to pick your mode, tools, and view style.</span>
+          </li>
+          <li>
+            <strong>Do one small thing</strong>
+            <span>Start with What Next and choose one manageable step.</span>
+          </li>
+          <li>
+            <strong>Protect your energy</strong>
+            <span>Start the work boundary tracker and pause before you hit empty.</span>
+          </li>
         </ol>
-        <div className="start-here-actions">
-          <a className="btn-primary" href="#next-task">
-            Open What Next
-          </a>
-          <a className="btn-secondary" href="#work-boundary">
-            Open work boundary tracker
-          </a>
-        </div>
       </section>
 
       <section id="work-boundary" className="work-boundary" aria-label="Work boundary tracker">
@@ -1534,30 +1790,80 @@ function App() {
 
       <nav className="jump-nav" aria-label="Jump to a tool">
         <div className="jump-nav-head">
-          <p>Choose a tool to start. If you are unsure, begin with What Next.</p>
+          <p>
+            {toolView === 'single'
+              ? 'One tool view is on. Use the list below to switch tools.'
+              : 'Choose a tool to start. If you are unsure, begin with What Next.'}
+          </p>
           <span className="jump-status">Now viewing: {activeToolLabel}</span>
         </div>
+        {toolView === 'single' ? (
+          <p className="single-tool-reassure">You only need one small step right now.</p>
+        ) : null}
         <ul>
           {visibleToolLinks.map((link) => (
             <li key={link.id}>
-              <a
-                href={`#${link.id}`}
-                className={activeTool === link.id ? 'active-jump-link' : ''}
-                aria-current={activeTool === link.id ? 'location' : undefined}
-              >
-                {link.label}
-              </a>
+              {toolView === 'single' ? (
+                <button
+                  type="button"
+                  className={`jump-tool-button ${singleToolId === link.id ? 'active-jump-link' : ''}`}
+                  onClick={() => setSingleToolId(link.id)}
+                  aria-current={singleToolId === link.id ? 'location' : undefined}
+                >
+                  {link.label}
+                </button>
+              ) : (
+                <a
+                  href={`#${link.id}`}
+                  className={activeTool === link.id ? 'active-jump-link' : ''}
+                  aria-current={activeTool === link.id ? 'location' : undefined}
+                >
+                  {link.label}
+                </a>
+              )}
             </li>
           ))}
         </ul>
-        <div className="jump-progress" aria-hidden="true">
-          <span className="progress-fill" style={{ width: `${journeyPercent}%` }}></span>
-        </div>
+        {toolView === 'single' ? (
+          <div className="single-tool-controls" aria-label="Single tool navigation">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={!prevToolId}
+              onClick={() => prevToolId && openSingleTool(prevToolId)}
+            >
+              Previous tool
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setActiveTool(singleToolId)
+                setToolView('all')
+              }}
+            >
+              Back to all tools
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={!nextToolId}
+              onClick={() => nextToolId && openSingleTool(nextToolId)}
+            >
+              Next tool
+            </button>
+          </div>
+        ) : (
+          <div className="jump-progress" aria-hidden="true">
+            <span className="progress-fill" style={{ width: `${journeyPercent}%` }}></span>
+          </div>
+        )}
       </nav>
 
       <main id="main-content" className="tool-stack">
-        <section id="task-chunker" className={`tool-panel fade-in ${isToolVisible('task-chunker') ? '' : 'tool-hidden'}`} aria-labelledby="chunker-heading">
+        <section id="task-chunker" className={getToolPanelClass('task-chunker')} aria-labelledby="chunker-heading">
           <ToolHeading
+            {...getHeadingControls('task-chunker')}
             id="chunker-heading"
             title="Task splitter"
             copy="Turn one big task into small, clear steps."
@@ -1615,8 +1921,9 @@ function App() {
           </button>
         </section>
 
-        <section id="body-doubling" className={`tool-panel fade-in ${isToolVisible('body-doubling') ? '' : 'tool-hidden'}`} aria-labelledby="body-double-heading">
+        <section id="body-doubling" className={getToolPanelClass('body-doubling')} aria-labelledby="body-double-heading">
           <ToolHeading
+            {...getHeadingControls('body-doubling')}
             id="body-double-heading"
             title="Body doubling timer"
             copy="Set a timer and work with a gentle companion."
@@ -1632,6 +1939,11 @@ function App() {
               </button>
             </div>
           ) : null}
+
+          <p className="meta-line">
+            Body doubling means doing a task alongside someone else so it feels easier to start.
+            This timer gives you that same "someone is here with me" feeling.
+          </p>
 
           <div className="ambient" aria-hidden="true">
             <span className="orb orb-a"></span>
@@ -1692,8 +2004,9 @@ function App() {
           </div>
         </section>
 
-        <section id="next-task" className={`tool-panel fade-in ${isToolVisible('next-task') ? '' : 'tool-hidden'}`} aria-labelledby="next-task-heading">
+        <section id="next-task" className={getToolPanelClass('next-task')} aria-labelledby="next-task-heading">
           <ToolHeading
+            {...getHeadingControls('next-task')}
             id="next-task-heading"
             title="Pick my next task"
             copy="Add your tasks, then let this pick one next step."
@@ -1778,8 +2091,9 @@ function App() {
           </button>
         </section>
 
-        <section id="transition-helper" className={`tool-panel fade-in ${isToolVisible('transition-helper') ? '' : 'tool-hidden'}`} aria-labelledby="transition-heading">
+        <section id="transition-helper" className={getToolPanelClass('transition-helper')} aria-labelledby="transition-heading">
           <ToolHeading
+            {...getHeadingControls('transition-helper')}
             id="transition-heading"
             title="Transition helper"
             copy="A short checklist to help you switch tasks without losing your place."
@@ -1896,8 +2210,9 @@ function App() {
           </button>
         </section>
 
-        <section id="stuck-rescue" className={`tool-panel fade-in ${isToolVisible('stuck-rescue') ? '' : 'tool-hidden'}`} aria-labelledby="stuck-heading">
+        <section id="stuck-rescue" className={getToolPanelClass('stuck-rescue')} aria-labelledby="stuck-heading">
           <ToolHeading
+            {...getHeadingControls('stuck-rescue')}
             id="stuck-heading"
             title="Stuck rescue"
             copy="If you freeze, choose one tiny move and try 10 minutes."
@@ -1969,8 +2284,9 @@ function App() {
           </button>
         </section>
 
-        <section id="time-anchor" className={`tool-panel fade-in ${isToolVisible('time-anchor') ? '' : 'tool-hidden'}`} aria-labelledby="anchor-heading">
+        <section id="time-anchor" className={getToolPanelClass('time-anchor')} aria-labelledby="anchor-heading">
           <ToolHeading
+            {...getHeadingControls('time-anchor')}
             id="anchor-heading"
             title="Time anchor"
             copy="Gentle time nudges while you work, so hours do not disappear."
@@ -2036,8 +2352,9 @@ function App() {
           </button>
         </section>
 
-        <section id="money-tracker" className={`tool-panel fade-in ${isToolVisible('money-tracker') ? '' : 'tool-hidden'}`} aria-labelledby="finance-heading">
+        <section id="money-tracker" className={getToolPanelClass('money-tracker')} aria-labelledby="finance-heading">
           <ToolHeading
+            {...getHeadingControls('money-tracker')}
             id="finance-heading"
             title="Track invoices you sent"
             copy="Log who you billed, how much, and whether they have paid."
@@ -2154,8 +2471,9 @@ function App() {
           </button>
         </section>
 
-        <section id="brain-dump" className={`tool-panel fade-in ${isToolVisible('brain-dump') ? '' : 'tool-hidden'}`} aria-labelledby="brain-dump-heading">
+        <section id="brain-dump" className={getToolPanelClass('brain-dump')} aria-labelledby="brain-dump-heading">
           <ToolHeading
+            {...getHeadingControls('brain-dump')}
             id="brain-dump-heading"
             title="Brain dump"
             copy="Get everything out of your head, then sort it one thought at a time."
@@ -2322,8 +2640,9 @@ function App() {
           </button>
         </section>
 
-        <section id="weekly-review" className={`tool-panel fade-in ${isToolVisible('weekly-review') ? '' : 'tool-hidden'}`} aria-labelledby="weekly-heading">
+        <section id="weekly-review" className={getToolPanelClass('weekly-review')} aria-labelledby="weekly-heading">
           <ToolHeading
+            {...getHeadingControls('weekly-review')}
             id="weekly-heading"
             title="Weekly review prompts"
             copy="Simple prompts to help you look back on your week."
@@ -2419,8 +2738,9 @@ function App() {
           </button>
         </section>
 
-        <section id="pomodoro" className={`tool-panel fade-in ${isToolVisible('pomodoro') ? '' : 'tool-hidden'}`} aria-labelledby="pomodoro-heading">
+        <section id="pomodoro" className={getToolPanelClass('pomodoro')} aria-labelledby="pomodoro-heading">
           <ToolHeading
+            {...getHeadingControls('pomodoro')}
             id="pomodoro-heading"
             title="Flexible pomodoro"
             copy="A focus timer you can adjust to suit your day."
@@ -2436,6 +2756,11 @@ function App() {
               </button>
             </div>
           ) : null}
+
+          <p className="meta-line">
+            Pomodoro is a simple focus rhythm: short work block, short break, repeat. You can
+            change the timings to fit your energy.
+          </p>
 
           <div className="double-input">
             <label>
@@ -2517,8 +2842,9 @@ function App() {
           </div>
         </section>
 
-        <section id="self-care" className={`tool-panel fade-in ${isToolVisible('self-care') ? '' : 'tool-hidden'}`} aria-labelledby="selfcare-heading">
+        <section id="self-care" className={getToolPanelClass('self-care')} aria-labelledby="selfcare-heading">
           <ToolHeading
+            {...getHeadingControls('self-care')}
             id="selfcare-heading"
             title="Body check-in"
             copy="A quick check for water, food, and posture during the day."
@@ -2575,8 +2901,9 @@ function App() {
           </button>
         </section>
 
-        <section id="wind-down" className={`tool-panel fade-in ${isToolVisible('wind-down') ? '' : 'tool-hidden'}`} aria-labelledby="wind-down-heading">
+        <section id="wind-down" className={getToolPanelClass('wind-down')} aria-labelledby="wind-down-heading">
           <ToolHeading
+            {...getHeadingControls('wind-down')}
             id="wind-down-heading"
             title="End-of-day wind-down"
             copy="A short checklist to help you finish work and switch off."
@@ -2711,7 +3038,7 @@ function App() {
           <p>
             Calm Space is made by one neurodivergent human for other neurodivergent humans.
             If it helps you, you can support it on Ko-fi. It helps cover hosting, updates,
-            and new tools. No pressure.
+            and new tools. No pressure, it'll be free for everyone forever.
           </p>
           <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
             Support on Ko-fi
