@@ -148,7 +148,6 @@ type ToolIconName =
 const STORAGE_PREFIX = 'calm-space'
 const THEME_KEY = `${STORAGE_PREFIX}:theme`
 const DAY_MODE_KEY = `${STORAGE_PREFIX}:day-mode`
-const CALM_VIEW_KEY = `${STORAGE_PREFIX}:calm-view`
 const ESSENTIALS_ONLY_KEY = `${STORAGE_PREFIX}:essentials-only`
 
 const toolLinks: Array<{ id: ToolId; label: string }> = [
@@ -176,25 +175,25 @@ const essentialToolIds: ToolId[] = [
 
 const toolTipsText: Record<ToolId, string> = {
   'task-chunker':
-    'Write the task in plain words. Keep it rough. We will split it into small actions.',
+    'Write it however it comes out. We will turn it into small, doable steps.',
   'body-doubling':
-    'Set a short session and begin. You can pause any time.',
-  'next-task': 'Keep this list short. The button picks one next action.',
+    'Pick a short session and start. Pause whenever you need to.',
+  'next-task': 'Keep this list short. The button picks one next step for you.',
   'transition-helper':
-    'Use this quick checklist when switching tasks so your brain can land gently.',
+    'Use this quick checklist when switching tasks so your brain can catch up.',
   'stuck-rescue':
-    'When you are frozen, pick one tiny move and commit for 10 minutes.',
+    'If you feel stuck, pick one tiny move and do just 10 minutes.',
   'time-anchor':
-    'Get gentle local-time nudges while working so time does not disappear.',
+    'Get gentle time nudges while you work, so hours do not disappear.',
   'wind-down':
-    'This helps you close the day. Done is better than perfect.',
+    'Use this to close your day without overthinking it.',
   'money-tracker':
-    'Log invoices as you send them so you can see what is paid and what is still outstanding.',
-  'brain-dump': 'Get it all out. Then park each thought somewhere: do it today, save it for later, or let it go.',
+    'Log invoices as you send them so you can quickly see what is paid and what is not.',
+  'brain-dump': 'Get it all out, then sort each thought: do today, park for later, or let go.',
   'weekly-review':
-    'Short answers are fine. You are only looking for what helped and what did not.',
-  pomodoro: 'Adjust focus and rest times to match your energy.',
-  'self-care': 'Quick check-in for water, food, and posture while the day is moving.',
+    'Short answers are enough. Just notice what helped and what did not.',
+  pomodoro: 'Set your focus and rest times to match your energy today.',
+  'self-care': 'A quick check for water, food, and posture while you work.',
 }
 
 const dayModes: Array<{
@@ -208,7 +207,7 @@ const dayModes: Array<{
   {
     id: 'gentle',
     title: 'Gentle Start',
-    summary: 'Lower pressure, softer momentum, easier entry.',
+    summary: 'Lower pressure and ease into the day.',
     bodyDouble: 20,
     focus: 25,
     rest: 10,
@@ -216,7 +215,7 @@ const dayModes: Array<{
   {
     id: 'focus',
     title: 'Deep Focus',
-    summary: 'Longer focus blocks for high-priority work.',
+    summary: 'Longer focus blocks for priority work.',
     bodyDouble: 45,
     focus: 50,
     rest: 15,
@@ -224,7 +223,7 @@ const dayModes: Array<{
   {
     id: 'recovery',
     title: 'Recovery Mode',
-    summary: 'Protect energy and keep progress sustainable.',
+    summary: 'Protect your energy and keep things manageable.',
     bodyDouble: 15,
     focus: 20,
     rest: 15,
@@ -333,21 +332,6 @@ const loadStoredDayMode = (): DayMode => {
   return 'gentle'
 }
 
-const loadStoredCalmView = (): boolean => {
-  try {
-    const raw = localStorage.getItem(CALM_VIEW_KEY)
-    if (raw === null) {
-      return true
-    }
-
-    return raw === 'true'
-  } catch {
-    // Silently fail
-  }
-
-  return true
-}
-
 const loadStoredEssentialsOnly = (): boolean => {
   try {
     return localStorage.getItem(ESSENTIALS_ONLY_KEY) === 'true'
@@ -424,7 +408,7 @@ const formatCurrency = (amount: number) =>
 
 const companionLines = [
   'I am here with you. Keep it small and steady.',
-  'You dont need to finish everything. Just this step.',
+  'You do not need to finish everything. Just this step.',
   'If you got distracted, welcome back. Start again now.',
   'Breathe, then continue for 2 more minutes.',
   'Quiet progress still counts.',
@@ -546,7 +530,6 @@ function App() {
   const [stuckRescueSecondsLeft, setStuckRescueSecondsLeft] = useState(0)
   const [activeTool, setActiveTool] = useState<ToolId>('task-chunker')
   const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
-  const [calmView, setCalmView] = useState<boolean>(() => loadStoredCalmView())
   const [essentialsOnly, setEssentialsOnly] = useState<boolean>(() => loadStoredEssentialsOnly())
 
   useEffect(() => {
@@ -557,14 +540,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem(DAY_MODE_KEY, dayMode)
   }, [dayMode])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(CALM_VIEW_KEY, String(calmView))
-    } catch {
-      // Silently fail if storage is unavailable
-    }
-  }, [calmView])
 
   useEffect(() => {
     try {
@@ -866,20 +841,6 @@ function App() {
     visibleToolLinks.findIndex((link) => link.id === activeTool),
   )
   const journeyPercent = ((activeToolIndex + 1) / Math.max(1, visibleToolLinks.length)) * 100
-  const readyToolCount = [
-    hasTaskChunkerContent,
-    hasOpenTasks || hasCompletedTasks,
-    hasTransitionContent,
-    hasRescueContent,
-    hasAnchorContent,
-    hasMoneyTrackerContent,
-    hasBrainDumpContent,
-    hasWeeklyReviewContent,
-    hasPomodoroDeviation,
-    hasSelfCareContent,
-    hasWindDownContent,
-  ].filter(Boolean).length
-
   const confirmReset = (message: string, hasContent: boolean, action: () => void) => {
     if (!hasContent) {
       return
@@ -1318,81 +1279,14 @@ function App() {
   }
 
   return (
-    <div className={`app-shell ${calmView ? 'calm-view' : ''}`}>
+    <div className="app-shell">
       <a className="skip-link" href="#main-content">
         Skip to tools
       </a>
 
-      <section className="work-timer-bar" aria-label="Work session tracker">
-        <div className="timer-display">
-          {data.isWorking ? (
-            <>
-              <div>
-                <p className="timer-label">Today</p>
-                <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
-                <p className="timer-meta">Currently working</p>
-                <p className="timer-guide">
-                  This tracks the whole day, not just the current stretch. Start once, pause for
-                  breaks, then resume where you left off.
-                </p>
-              </div>
-            </>
-          ) : data.breakStartTime ? (
-            <>
-              <div>
-                <p className="timer-label">Today</p>
-                <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
-                <p className="timer-meta">On break for {formatTime(breakElapsedSeconds)}</p>
-                <p className="timer-guide">
-                  This tracks the whole day, not just the current stretch. Start once, pause for
-                  breaks, then resume where you left off.
-                </p>
-              </div>
-            </>
-          ) : (
-            <div>
-              <p className="timer-label">Today</p>
-              <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
-              <p className="timer-meta">Ready to start</p>
-              <p className="timer-guide">
-                This tracks the whole day, not just the current stretch. Start once, pause for
-                breaks, then resume where you left off.
-              </p>
-            </div>
-          )}
-        </div>
-        <div className="timer-controls">
-          {!data.isWorking && !data.breakStartTime ? (
-            <button type="button" onClick={startWork} className="btn-start">
-              Start day
-            </button>
-          ) : null}
-          {data.isWorking ? (
-            <>
-              <button type="button" onClick={goOnBreak} className="btn-break">
-                Take a break
-              </button>
-              <button type="button" onClick={stopWork} className="btn-stop">
-                End day
-              </button>
-            </>
-          ) : null}
-          {data.breakStartTime ? (
-            <>
-              <button type="button" onClick={endBreak} className="btn-resume">
-                Resume work
-              </button>
-              <button type="button" onClick={stopWork} className="btn-stop">
-                End day
-              </button>
-            </>
-          ) : null}
-        </div>
-      </section>
-
       <section className="timer-info" aria-label="Work timer explanation">
         <p>
-          {preferredName ? `Welcome, ${preferredName}. ` : 'Welcome. '}Take what helps and ignore the rest. Calm Space is here to make your day feel lighter, one small step at a time.
+          {preferredName ? `Welcome, ${preferredName}. ` : 'Welcome. '}Take what helps and leave what does not. Calm Space is here to make your day feel a bit easier, one small step at a time.
         </p>
       </section>
 
@@ -1448,14 +1342,14 @@ function App() {
       ) : null}
 
       <header className="hero" id="top">
-        <div className="hero-glow" aria-hidden="true"></div>
         <img className="brand-logo" src="/calmspace-logo.svg" alt="Calm Space logo" />
         <div className="hero-layout">
           <div className="hero-copy">
             <p className="eyebrow">Calm Space Toolkit</p>
             <h1>Simple tools for work and daily life.</h1>
             <p className="intro">
-              Built for neurodivergent people by neurodivergent people.
+              Built by a neurodivergent person for neurodivergent people. No jargon, no pressure,
+              just simple tools to help you start, keep going, and switch off.
             </p>
 
             <label className="name-card">
@@ -1472,61 +1366,12 @@ function App() {
                 }
               />
             </label>
-
-            <div className="hero-notes" aria-label="Calm Space highlights">
-              <span>Local-first</span>
-              <span>Flexible pacing</span>
-              <span>No sign-up needed</span>
-            </div>
-
-            <div className="hero-actions">
-              <a className="hero-cta btn-primary" href="#task-chunker">
-                Start with task splitter
-              </a>
-              <a className="hero-cta btn-secondary" href="#body-doubling">
-                Begin a focus session
-              </a>
-            </div>
           </div>
-
-          <aside className="hero-spotlight" aria-label="Today in Calm Space">
-            <p className="hero-spotlight-label">Today in Calm Space</p>
-            <h2>{currentDayMode.title}</h2>
-            <p className="hero-spotlight-copy">{currentDayMode.summary}</p>
-
-            <div className="hero-stat-grid">
-              <article className="hero-stat">
-                <strong>{visibleToolLinks.length}</strong>
-                <span>{essentialsOnly ? 'essential tools' : 'support tools'}</span>
-              </article>
-              <article className="hero-stat">
-                <strong>{readyToolCount}</strong>
-                <span>already in use</span>
-              </article>
-              <article className="hero-stat">
-                <strong>{currentDayMode.focus}/{currentDayMode.rest}</strong>
-                <span>focus rhythm</span>
-              </article>
-            </div>
-
-            <div className="hero-progress-card">
-              <div className="hero-progress-head">
-                <span>Page journey</span>
-                <strong>
-                  {activeToolIndex + 1}/{visibleToolLinks.length}
-                </strong>
-              </div>
-              <div className="progress-meter" aria-hidden="true">
-                <span className="progress-fill" style={{ width: `${journeyPercent}%` }}></span>
-              </div>
-              <p className="hero-progress-copy">You are currently around {activeToolLabel}.</p>
-            </div>
-          </aside>
         </div>
 
         <section className="mode-and-theme" aria-label="Choose your setup for today">
           <div className="mode-picker">
-            <p>Choose your day mode</p>
+            <p>Pick your day mode</p>
             <div className="chip-row">
               {dayModes.map((mode) => (
                 <button
@@ -1534,6 +1379,7 @@ function App() {
                   type="button"
                   className={`chip ${dayMode === mode.id ? 'active-chip' : ''}`}
                   onClick={() => applyDayMode(mode.id)}
+                  aria-pressed={dayMode === mode.id}
                 >
                   <strong>{mode.title}</strong>
                   <span>{mode.summary}</span>
@@ -1541,8 +1387,7 @@ function App() {
               ))}
             </div>
             <p className="mode-summary" aria-live="polite">
-              {currentDayMode.title}: body doubling {currentDayMode.bodyDouble} min, pomodoro{' '}
-              {currentDayMode.focus}/{currentDayMode.rest} min.
+              {currentDayMode.title}: body doubling {currentDayMode.bodyDouble} min, pomodoro {currentDayMode.focus}/{currentDayMode.rest} min.
             </p>
           </div>
 
@@ -1557,32 +1402,11 @@ function App() {
                     theme === themeOption.id ? 'active-theme' : ''
                   }`}
                   onClick={() => setTheme(themeOption.id)}
+                  aria-pressed={theme === themeOption.id}
                 >
                   {themeOption.label}
                 </button>
               ))}
-            </div>
-          </div>
-
-          <div className="density-picker">
-            <p>Visual intensity</p>
-            <div className="chip-row">
-              <button
-                type="button"
-                className={`chip ${calmView ? '' : 'active-chip'}`}
-                onClick={() => setCalmView(false)}
-              >
-                <strong>Full</strong>
-                <span>Shows all visual cues and extras</span>
-              </button>
-              <button
-                type="button"
-                className={`chip ${calmView ? 'active-chip' : ''}`}
-                onClick={() => setCalmView(true)}
-              >
-                <strong>Calm</strong>
-                <span>Reduces visual noise and clutter</span>
-              </button>
             </div>
           </div>
 
@@ -1593,6 +1417,7 @@ function App() {
                 type="button"
                 className={`chip ${essentialsOnly ? 'active-chip' : ''}`}
                 onClick={() => setEssentialsOnly(true)}
+                aria-pressed={essentialsOnly}
               >
                 <strong>Essentials only</strong>
                 <span>Show a smaller set to reduce overwhelm</span>
@@ -1601,6 +1426,7 @@ function App() {
                 type="button"
                 className={`chip ${essentialsOnly ? '' : 'active-chip'}`}
                 onClick={() => setEssentialsOnly(false)}
+                aria-pressed={!essentialsOnly}
               >
                 <strong>All tools</strong>
                 <span>Show the full toolkit</span>
@@ -1610,9 +1436,105 @@ function App() {
         </section>
       </header>
 
+      <section className="start-here" aria-label="How to start">
+        <h2>Start here</h2>
+        <p>
+          If you are not sure where to begin, try this:
+        </p>
+        <ol>
+          <li>Pick a <strong>Day mode</strong> that matches your energy.</li>
+          <li>Open <strong>What Next</strong> and choose one small task.</li>
+          <li>Start the <strong>Work boundary tracker</strong> so you do not drift into overtime.</li>
+          <li>Use the jump menu whenever you want to switch tools.</li>
+        </ol>
+        <div className="start-here-actions">
+          <a className="btn-primary" href="#next-task">
+            Open What Next
+          </a>
+          <a className="btn-secondary" href="#work-boundary">
+            Open work boundary tracker
+          </a>
+        </div>
+      </section>
+
+      <section id="work-boundary" className="work-boundary" aria-label="Work boundary tracker">
+        <h2>Work boundary tracker</h2>
+        <p className="work-boundary-copy">
+          It is easy to slip into overtime by accident. This tracks your full workday so you can
+          spot when it is getting long and take a break.
+        </p>
+
+        <section className="work-timer-bar" aria-label="Work session tracker">
+          <div className="timer-display">
+            {data.isWorking ? (
+              <>
+                <div>
+                  <p className="timer-label">Today</p>
+                  <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
+                  <p className="timer-meta">Currently working</p>
+                  <p className="timer-guide">
+                    This tracks the whole day, not just the current stretch. Start once, pause for
+                    breaks, then resume where you left off.
+                  </p>
+                </div>
+              </>
+            ) : data.breakStartTime ? (
+              <>
+                <div>
+                  <p className="timer-label">Today</p>
+                  <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
+                  <p className="timer-meta">On break for {formatTime(breakElapsedSeconds)}</p>
+                  <p className="timer-guide">
+                    This tracks the whole day, not just the current stretch. Start once, pause for
+                    breaks, then resume where you left off.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div>
+                <p className="timer-label">Today</p>
+                <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
+                <p className="timer-meta">Ready to start</p>
+                <p className="timer-guide">
+                  This tracks the whole day, not just the current stretch. Start once, pause for
+                  breaks, then resume where you left off.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="timer-controls">
+            {!data.isWorking && !data.breakStartTime ? (
+              <button type="button" onClick={startWork} className="btn-start">
+                Start work timer
+              </button>
+            ) : null}
+            {data.isWorking ? (
+              <>
+                <button type="button" onClick={goOnBreak} className="btn-break">
+                  Take a break
+                </button>
+                <button type="button" onClick={stopWork} className="btn-stop">
+                  Stop work timer
+                </button>
+              </>
+            ) : null}
+            {data.breakStartTime ? (
+              <>
+                <button type="button" onClick={endBreak} className="btn-resume">
+                  Resume work
+                </button>
+                <button type="button" onClick={stopWork} className="btn-stop">
+                  Stop work timer
+                </button>
+              </>
+            ) : null}
+          </div>
+        </section>
+      </section>
+
       <nav className="jump-nav" aria-label="Jump to a tool">
         <div className="jump-nav-head">
-          <p>Jump to a tool</p>
+          <p>Choose a tool to start. If you are unsure, begin with What Next.</p>
           <span className="jump-status">Now viewing: {activeToolLabel}</span>
         </div>
         <ul>
@@ -1638,7 +1560,7 @@ function App() {
           <ToolHeading
             id="chunker-heading"
             title="Task splitter"
-            copy="Paste a big task and get a short list of small steps."
+            copy="Turn one big task into small, clear steps."
             icon="chunker"
             category="Plan"
           />
@@ -1689,7 +1611,7 @@ function App() {
           )}
 
           <button type="button" className="btn-clear" disabled={!hasTaskChunkerContent} onClick={resetTaskChunker}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -1697,7 +1619,7 @@ function App() {
           <ToolHeading
             id="body-double-heading"
             title="Body doubling timer"
-            copy="Set a timer and work alongside a calm visual companion."
+            copy="Set a timer and work with a gentle companion."
             icon="double"
             category="Focus"
           />
@@ -1765,7 +1687,7 @@ function App() {
               Pause
             </button>
             <button type="button" className="btn-clear" disabled={!hasBodyDoublingDeviation} onClick={resetBodyDoubling}>
-              Reset tool
+              Clear this tool
             </button>
           </div>
         </section>
@@ -1774,7 +1696,7 @@ function App() {
           <ToolHeading
             id="next-task-heading"
             title="Pick my next task"
-            copy="Add tasks, then pick one next action."
+            copy="Add your tasks, then let this pick one next step."
             icon="next"
             category="Plan"
           />
@@ -1846,13 +1768,13 @@ function App() {
               ))}
             </ul>
           ) : (
-            <p className="empty-state">Add a few tasks, then let this tool pick one for you.</p>
+            <p className="empty-state">Add a few tasks, then let this pick one for you.</p>
           )}
 
           <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasNextTaskContent} onClick={resetNextTask}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -1860,7 +1782,7 @@ function App() {
           <ToolHeading
             id="transition-heading"
             title="Transition helper"
-            copy="A tiny checklist to switch tasks without losing your place."
+            copy="A short checklist to help you switch tasks without losing your place."
             icon="transition"
             category="Switch"
           />
@@ -1970,7 +1892,7 @@ function App() {
           </label>
 
           <button type="button" className="btn-clear" disabled={!hasTransitionContent} onClick={resetTransitionHelper}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -1978,7 +1900,7 @@ function App() {
           <ToolHeading
             id="stuck-heading"
             title="Stuck rescue"
-            copy="When you freeze, choose one tiny move and commit for 10 minutes."
+            copy="If you freeze, choose one tiny move and try 10 minutes."
             icon="rescue"
             category="Recover"
           />
@@ -2032,7 +1954,7 @@ function App() {
             </p>
           ) : (
             <p className="empty-state">
-              Add what you are stuck on, then press the button to get a more relevant next step.
+              Add what you are stuck on, then press the button for a tiny next move.
             </p>
           )}
 
@@ -2043,7 +1965,7 @@ function App() {
           ) : null}
 
           <button type="button" className="btn-clear" disabled={!hasRescueContent} onClick={resetStuckRescue}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -2051,7 +1973,7 @@ function App() {
           <ToolHeading
             id="anchor-heading"
             title="Time anchor"
-            copy="Gentle local-time nudges while you work so hours do not disappear."
+            copy="Gentle time nudges while you work, so hours do not disappear."
             icon="anchor"
             category="Focus"
           />
@@ -2105,12 +2027,12 @@ function App() {
             </p>
           ) : (
             <p className="empty-state">
-              Start your day timer and add your current task for more relevant time check-ins.
+              Start your work timer and add your task for better check-ins.
             </p>
           )}
 
           <button type="button" className="btn-clear" disabled={!hasAnchorContent} onClick={resetTimeAnchor}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -2118,7 +2040,7 @@ function App() {
           <ToolHeading
             id="finance-heading"
             title="Track invoices you sent"
-            copy="Log who you billed, how much, and whether it has been paid yet."
+            copy="Log who you billed, how much, and whether they have paid."
             icon="money"
             category="Admin"
           />
@@ -2183,7 +2105,7 @@ function App() {
           </div>
 
           <p className="meta-line">
-            Saved on this device in this browser. If you clear browser data or switch devices, it will not come with you.
+            Saved in this browser on this device. If you clear browser data or switch devices, it will not come with you.
           </p>
 
           {data.invoices.length > 0 ? (
@@ -2228,7 +2150,7 @@ function App() {
           )}
 
           <button type="button" className="btn-clear" disabled={!hasMoneyTrackerContent} onClick={resetMoneyTracker}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -2236,7 +2158,7 @@ function App() {
           <ToolHeading
             id="brain-dump-heading"
             title="Brain dump"
-            copy="Get it all out. Then decide what to do with each thought."
+            copy="Get everything out of your head, then sort it one thought at a time."
             icon="dump"
             category="Clear"
           />
@@ -2257,7 +2179,7 @@ function App() {
                 What&apos;s on your mind?
                 <textarea
                   rows={7}
-                  placeholder={"Write freely. Sentences, lists, half-thoughts — all fine.\nGet it all out."}
+                  placeholder={"Write freely. Sentences, lists, half-thoughts - all fine.\nGet it all out."}
                   value={data.brainDumpInput}
                   onChange={(event) =>
                     setData((prev) => ({ ...prev, brainDumpInput: event.target.value }))
@@ -2277,7 +2199,7 @@ function App() {
             /* Phase 2 — review parsed items before triaging */
             <>
               <p className="meta-line">
-                {data.brainDumpItems.length} thoughts found — tap × to remove anything that landed wrong
+                {data.brainDumpItems.length} thoughts found - tap x to remove anything that landed wrong
               </p>
               <ul className="review-list">
                 {data.brainDumpItems.map((item) => (
@@ -2355,7 +2277,7 @@ function App() {
                   </ul>
                 </>
               ) : (
-                <p className="meta-line">All sorted. Good work.</p>
+                <p className="meta-line">All sorted. Nice work.</p>
               )}
 
               {todayBrainDumpItems.length > 0 && (
@@ -2396,7 +2318,7 @@ function App() {
           <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasBrainDumpContent} onClick={resetBrainDump}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -2404,7 +2326,7 @@ function App() {
           <ToolHeading
             id="weekly-heading"
             title="Weekly review prompts"
-            copy="Quick prompts to review your week."
+            copy="Simple prompts to help you look back on your week."
             icon="review"
             category="Reflect"
           />
@@ -2493,7 +2415,7 @@ function App() {
           <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasWeeklyReviewContent} onClick={resetWeeklyReview}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -2501,7 +2423,7 @@ function App() {
           <ToolHeading
             id="pomodoro-heading"
             title="Flexible pomodoro"
-            copy="Focus timer with adjustable rest."
+            copy="A focus timer you can adjust to suit your day."
             icon="pomo"
             category="Focus"
           />
@@ -2590,7 +2512,7 @@ function App() {
               disabled={!hasPomodoroDeviation}
               onClick={resetPomodoro}
             >
-              Reset tool
+              Clear this tool
             </button>
           </div>
         </section>
@@ -2599,7 +2521,7 @@ function App() {
           <ToolHeading
             id="selfcare-heading"
             title="Body check-in"
-            copy="A quick place to keep track of water, food, and posture through the day."
+            copy="A quick check for water, food, and posture during the day."
             icon="selfcare"
             category="Care"
           />
@@ -2649,7 +2571,7 @@ function App() {
           </ul>
 
           <button type="button" className="btn-clear" disabled={!hasSelfCareContent} onClick={resetSelfCare}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
 
@@ -2657,7 +2579,7 @@ function App() {
           <ToolHeading
             id="wind-down-heading"
             title="End-of-day wind-down"
-            copy="A short checklist to close your workday."
+            copy="A short checklist to help you finish work and switch off."
             icon="winddown"
             category="Close"
           />
@@ -2750,7 +2672,7 @@ function App() {
               </ul>
             </>
           ) : (
-            <p className="empty-state">No items yet. Add one to start building your checklist.</p>
+            <p className="empty-state">No items yet. Add one to start your checklist.</p>
           )}
 
           <label>
@@ -2777,7 +2699,7 @@ function App() {
           <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasWindDownContent} onClick={resetWindDown}>
-            Reset tool
+            Clear this tool
           </button>
         </section>
       </main>
@@ -2787,9 +2709,9 @@ function App() {
           <p className="tool-category">Support</p>
           <h2>Keep Calm Space growing</h2>
           <p>
-            Calm Space is made by a neurodivergent human for other neurodivergent humans.
-            If it helps, you can support it on Ko-fi. Donations help with hosting, updates,
-            and new tools. No pressure at all.
+            Calm Space is made by one neurodivergent human for other neurodivergent humans.
+            If it helps you, you can support it on Ko-fi. It helps cover hosting, updates,
+            and new tools. No pressure.
           </p>
           <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
             Support on Ko-fi
@@ -2800,7 +2722,7 @@ function App() {
           <div>
             <p className="footer-kicker">Calm Space</p>
             <p className="footer-note">
-              Calm Space stores your entries in this browser only. If you clear browser data or switch devices, your saved data will not move with you.
+              Calm Space stores your entries in this browser only. If you clear browser data or use another device, your saved data will not move with you.
             </p>
           </div>
           <div className="footer-links">
