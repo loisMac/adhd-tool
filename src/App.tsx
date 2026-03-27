@@ -388,9 +388,9 @@ const formatCurrency = (amount: number) =>
 
 const companionLines = [
   'I am here with you. Keep it small and steady.',
-  'You do not need to finish everything. Just this step.',
+  'You dont need to finish everything. Just this step.',
   'If you got distracted, welcome back. Start again now.',
-  'Breathe once. Then continue for 2 more minutes.',
+  'Breathe, then continue for 2 more minutes.',
   'Quiet progress still counts.',
 ]
 
@@ -398,7 +398,7 @@ const rescueActions = [
   'Do 2 minutes only.',
   'Reduce the task to one tiny step.',
   'Write the very next click/action.',
-  'Stand, stretch, then restart gently.',
+  'Stand, stretch, then restart.',
   'Open the file and add one line.',
   'Send a short "need 15 min" message.',
 ]
@@ -1237,7 +1237,7 @@ function App() {
         <p className="eyebrow">Calm Space Toolkit</p>
         <h1>Simple tools for work and daily life.</h1>
         <p className="intro">
-          Built for neurodivergent people. Clear steps, calm layouts, and practical tools.
+          Built for neurodivergent people by neurodivergent people.
         </p>
 
         <section className="mode-and-theme" aria-label="Choose your setup for today">
@@ -2317,6 +2317,7 @@ function App() {
         <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
           Support on Ko-fi
         </a>
+        <p className="site-credit">Built by loismakeswebsites</p>
       </section>
     </div>
   )

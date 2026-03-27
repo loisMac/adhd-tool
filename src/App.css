@@ -1102,6 +1102,12 @@ button:hover {
   display: inline-block;
 }
 
+.site-credit {
+  margin: 0.9rem 0 0;
+  font-size: 0.86rem;
+  color: var(--ink-muted);
+}
+
 :root[data-theme='night'] .hero {
   background:
     radial-gradient(circle at 95% -18%, rgba(116, 143, 182, 0.2), transparent 34%),
