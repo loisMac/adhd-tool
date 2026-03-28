@@ -118,7 +118,7 @@ type ProfileData = {
 
 type TipsState = Record<string, boolean>
 type DayMode = 'gentle' | 'focus' | 'recovery'
-type ThemeName = 'dawn' | 'moss' | 'ocean' | 'night'
+type ThemeName = 'dawn' | 'moss' | 'ocean' | 'blush' | 'night'
 type ToolView = 'all' | 'single'
 
 type ToolId =
@@ -255,6 +255,7 @@ const themes: Array<{ id: ThemeName; label: string }> = [
   { id: 'dawn', label: 'Dawn' },
   { id: 'moss', label: 'Moss' },
   { id: 'ocean', label: 'Ocean' },
+  { id: 'blush', label: 'Blush' },
   { id: 'night', label: 'Night' },
 ]
 

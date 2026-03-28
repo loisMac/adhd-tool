@@ -75,6 +75,24 @@
   --grid-line: rgba(237, 246, 255, 0.45);
 }
 
+:root[data-theme='blush'] {
+  --bg: #f7eff5;
+  --panel-bg: #faf3f8;
+  --line-soft: #e8d8e8;
+  --line-strong: #cbafc2;
+  --ink-strong: #3d2d32;
+  --ink-soft: #6b4d5c;
+  --ink-muted: #8b7a84;
+  --accent-strong: #a76b7d;
+  --accent-soft: #f0d5e6;
+  --action-soft: #ede0eb;
+  --action-soft-hover: #dcc8e0;
+  --focus-ring: #926180;
+  --bg-glow-a: rgba(167, 107, 125, 0.14);
+  --bg-glow-b: rgba(180, 120, 140, 0.12);
+  --grid-line: rgba(250, 243, 248, 0.5);
+}
+
 :root[data-theme='night'] {
   --bg: #1a1f26;
   --panel-bg: #242a32;

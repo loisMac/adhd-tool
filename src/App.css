@@ -484,6 +484,10 @@ button:disabled:hover {
   background: linear-gradient(140deg, #c8d8e8, #e8eff7);
 }
 
+.theme-blush {
+  background: linear-gradient(140deg, #f0d5e6, #f7eff5);
+}
+
 .theme-night {
   background: linear-gradient(140deg, #394254, #222a36);
   color: #edf3ff;
