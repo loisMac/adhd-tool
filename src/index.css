@@ -112,6 +112,25 @@
   --grid-line: rgba(255, 255, 255, 0.02);
 }
 
+/* colourful: light base with enough warmth for section tints to pop */
+:root[data-theme='colourful'] {
+  --bg: #ede9f0;
+  --panel-bg: #fdfcff;
+  --line-soft: #cdc8d8;
+  --line-strong: #aaa2ba;
+  --ink-strong: #1e1b26;
+  --ink-soft: #3e3a4a;
+  --ink-muted: #6b667a;
+  --accent-strong: #5a4e8a;
+  --accent-soft: #e0d9f5;
+  --action-soft: #e4e0f0;
+  --action-soft-hover: #d4ceea;
+  --focus-ring: #5a4e8a;
+  --bg-glow-a: rgba(140, 110, 190, 0.18);
+  --bg-glow-b: rgba(90, 140, 170, 0.15);
+  --grid-line: rgba(255, 255, 255, 0.5);
+}
+
 * {
   box-sizing: border-box;
 }

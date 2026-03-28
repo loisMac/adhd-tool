@@ -137,7 +137,7 @@ type ProfileData = {
 
 type TipsState = Record<string, boolean>
 type DayMode = 'gentle' | 'focus' | 'recovery'
-type ThemeName = 'dawn' | 'moss' | 'ocean' | 'blush' | 'night'
+type ThemeName = 'dawn' | 'moss' | 'ocean' | 'blush' | 'night' | 'colourful'
 type ToolView = 'all' | 'single'
 
 type ToolId =
@@ -270,12 +270,13 @@ const dayModes: Array<{
   },
 ]
 
-const themes: Array<{ id: ThemeName; label: string }> = [
+const themes: Array<{ id: ThemeName; label: string; hint?: string }> = [
   { id: 'dawn', label: 'Dawn' },
   { id: 'moss', label: 'Moss' },
   { id: 'ocean', label: 'Ocean' },
   { id: 'blush', label: 'Blush' },
   { id: 'night', label: 'Night' },
+  { id: 'colourful', label: 'Colourful', hint: 'Colour-codes each section to tell them apart' },
 ]
 
 const taskChunkerTypes: Array<{ id: TaskChunkerType; label: string; hint: string }> = [
@@ -1960,11 +1961,15 @@ function App() {
                     }`}
                     onClick={() => setTheme(themeOption.id)}
                     aria-pressed={theme === themeOption.id}
+                    title={themeOption.hint}
                   >
                     {themeOption.label}
                   </button>
                 ))}
               </div>
+              {themes.find((t) => t.id === theme)?.hint && (
+                <p className="theme-hint">{themes.find((t) => t.id === theme)!.hint}</p>
+              )}
             </div>
 
             <div className="tool-set-picker">

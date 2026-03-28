@@ -525,9 +525,21 @@ button:disabled:hover {
   color: #edf3ff;
 }
 
+.theme-colourful {
+  background: linear-gradient(140deg, #e8cfe0, #c8dfc4, #c4d4f0, #f0d8b8);
+  color: #2a2a2a;
+}
+
 .active-theme {
   border-color: var(--ink-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink-soft) 40%, transparent 60%);
+}
+
+.theme-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  font-style: italic;
 }
 
 .donate {
@@ -695,11 +707,28 @@ button:disabled:hover {
   border-radius: 1.45rem 1.45rem 0 0;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--accent-strong) 70%, white 30%),
-    color-mix(in srgb, var(--accent-soft) 75%, white 25%)
+    color-mix(in srgb, var(--tool-accent, var(--accent-strong)) 70%, white 30%),
+    color-mix(in srgb, var(--tool-accent, var(--accent-strong)) 36%, white 64%)
   );
   opacity: 0.78;
 }
+
+/* ── colourful theme: per-section accent colours ─────────────── */
+/* taller stripe + stronger tints */
+:root[data-theme='colourful'] .tool-panel::before { height: 6px; opacity: 0.92; }
+
+:root[data-theme='colourful'] #task-chunker.tool-panel      { --tool-accent: #2e7a6a; background: color-mix(in srgb, var(--panel-bg) 87%, #2e7a6a 13%); border-color: color-mix(in srgb, #2e7a6a 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #body-doubling.tool-panel     { --tool-accent: #5558c0; background: color-mix(in srgb, var(--panel-bg) 87%, #5558c0 13%); border-color: color-mix(in srgb, #5558c0 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #next-task.tool-panel         { --tool-accent: #c08820; background: color-mix(in srgb, var(--panel-bg) 87%, #c08820 13%); border-color: color-mix(in srgb, #c08820 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #transition-helper.tool-panel { --tool-accent: #c05050; background: color-mix(in srgb, var(--panel-bg) 87%, #c05050 13%); border-color: color-mix(in srgb, #c05050 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #stuck-rescue.tool-panel      { --tool-accent: #c06030; background: color-mix(in srgb, var(--panel-bg) 87%, #c06030 13%); border-color: color-mix(in srgb, #c06030 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #time-anchor.tool-panel       { --tool-accent: #3070c0; background: color-mix(in srgb, var(--panel-bg) 87%, #3070c0 13%); border-color: color-mix(in srgb, #3070c0 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #money-tracker.tool-panel     { --tool-accent: #4a8c28; background: color-mix(in srgb, var(--panel-bg) 87%, #4a8c28 13%); border-color: color-mix(in srgb, #4a8c28 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #brain-dump.tool-panel        { --tool-accent: #7040b8; background: color-mix(in srgb, var(--panel-bg) 87%, #7040b8 13%); border-color: color-mix(in srgb, #7040b8 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #weekly-review.tool-panel     { --tool-accent: #2888a8; background: color-mix(in srgb, var(--panel-bg) 87%, #2888a8 13%); border-color: color-mix(in srgb, #2888a8 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #pomodoro.tool-panel          { --tool-accent: #c03040; background: color-mix(in srgb, var(--panel-bg) 87%, #c03040 13%); border-color: color-mix(in srgb, #c03040 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #self-care.tool-panel         { --tool-accent: #288870; background: color-mix(in srgb, var(--panel-bg) 87%, #288870 13%); border-color: color-mix(in srgb, #288870 22%, var(--line-soft) 78%); }
+:root[data-theme='colourful'] #wind-down.tool-panel         { --tool-accent: #5050c0; background: color-mix(in srgb, var(--panel-bg) 87%, #5050c0 13%); border-color: color-mix(in srgb, #5050c0 22%, var(--line-soft) 78%); }
 
 .tool-panel:target {
   scroll-margin-top: 6rem;
