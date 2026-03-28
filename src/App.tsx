@@ -2134,7 +2134,7 @@ function App() {
         </section>
       </section>
 
-      <nav className="jump-nav" aria-label="Jump to a tool">
+      <nav className={`jump-nav ${toolView === 'single' ? 'jump-nav-static' : ''}`} aria-label="Jump to a tool">
         <div className="jump-nav-head">
           <p>
             {toolView === 'single'

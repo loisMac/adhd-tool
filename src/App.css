@@ -581,6 +581,11 @@ button:disabled:hover {
   background: color-mix(in srgb, var(--panel-bg) 86%, white 14%);
 }
 
+.jump-nav.jump-nav-static {
+  position: static;
+  top: auto;
+}
+
 .jump-nav-head {
   display: flex;
   align-items: flex-start;
