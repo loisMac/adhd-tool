@@ -260,6 +260,13 @@ button:disabled:hover {
   font-size: 0.9rem;
 }
 
+.self-care-modal-hint {
+  margin: 0.5rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .self-care-modal-actions {
   margin-top: 0.85rem;
   display: flex;

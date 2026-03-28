@@ -1833,6 +1833,9 @@ function App() {
                   ? `No worries if not. I'll check in again in around ${selfCareSnoozeMinutes} minutes while you're using Calm Space.`
                   : `No worries. I'll check in again in around ${selfCareSnoozeMinutes} minutes while you're using Calm Space.`}
             </p>
+            <p className="self-care-modal-hint">
+              You can change popup frequency and mute popups in the Body check-in tool.
+            </p>
             <div className="self-care-modal-actions">
               <button
                 type="button"
