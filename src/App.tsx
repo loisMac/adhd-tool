@@ -1798,7 +1798,7 @@ function App() {
           <span className="jump-status">Now viewing: {activeToolLabel}</span>
         </div>
         {toolView === 'single' ? (
-          <p className="single-tool-reassure">You only need one small step right now.</p>
+          <p className="single-tool-reassure">You only need to take one small step right now.</p>
         ) : null}
         <ul>
           {visibleToolLinks.map((link) => (
@@ -1926,7 +1926,7 @@ function App() {
             {...getHeadingControls('body-doubling')}
             id="body-double-heading"
             title="Body doubling timer"
-            copy="Set a timer and work with a gentle companion."
+            copy="Set a timer and work with a companion."
             icon="double"
             category="Focus"
           />
