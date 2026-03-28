@@ -202,7 +202,7 @@ const toolTipsText: Record<ToolId, string> = {
   'transition-helper':
     'Use this quick checklist when switching tasks so your brain can catch up.',
   'stuck-rescue':
-    'Feel stuck and can't start? A quick physical reset, then ease into it for just 2 minutes.'
+    'Feel stuck and can\'t start? A quick physical reset, then ease into it for just 2 minutes.',
   'time-anchor':
     'Get gentle time nudges while you work, so hours do not disappear.',
   'wind-down':
