@@ -54,10 +54,14 @@ type SelfCare = {
   water: boolean
   food: boolean
   posture: boolean
+  reminderPace: 'gentle' | 'standard' | 'frequent'
+  popupEnabled: boolean
   lastFoodCheck: number | null
   lastWaterCheck: number | null
+  lastPostureCheck: number | null
   foodReminderSnoozeUntil: number | null
   waterReminderSnoozeUntil: number | null
+  postureReminderSnoozeUntil: number | null
   lastReset: number
 }
 
@@ -367,10 +371,14 @@ const defaultData = (): ProfileData => ({
     water: false,
     food: false,
     posture: false,
+    reminderPace: 'standard',
+    popupEnabled: true,
     lastFoodCheck: null,
     lastWaterCheck: null,
+    lastPostureCheck: null,
     foodReminderSnoozeUntil: null,
     waterReminderSnoozeUntil: null,
+    postureReminderSnoozeUntil: null,
     lastReset: Date.now(),
   },
 })
@@ -671,7 +679,8 @@ function App() {
   const [stuckRescueSecondsLeft, setStuckRescueSecondsLeft] = useState(0)
   const [activeTool, setActiveTool] = useState<ToolId>('task-chunker')
   const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
-  const [selfCareModalFocus, setSelfCareModalFocus] = useState<'food' | 'water' | null>(null)
+  const [selfCareModalFocus, setSelfCareModalFocus] = useState<'food' | 'water' | 'posture' | null>(null)
+  const [selfCarePopupGraceActive, setSelfCarePopupGraceActive] = useState(true)
   const [essentialsOnly, setEssentialsOnly] = useState<boolean>(() => loadStoredEssentialsOnly())
   const [toolView, setToolView] = useState<ToolView>(() => loadStoredToolView())
   const [singleToolId, setSingleToolId] = useState<ToolId>(() => loadStoredSingleTool())
@@ -774,6 +783,14 @@ function App() {
       // Silently fail if storage is unavailable
     }
   }, [data, toolTips, profileId])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSelfCarePopupGraceActive(false)
+    }, 2 * 60 * 1000)
+
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (!bodyDoubleRunning) {
@@ -1015,25 +1032,45 @@ function App() {
   const selfCareReminder = getSelfCareReminder({
     lastFoodCheck: data.selfCare.lastFoodCheck,
     lastWaterCheck: data.selfCare.lastWaterCheck,
+    lastPostureCheck: data.selfCare.lastPostureCheck,
+    reminderPace: data.selfCare.reminderPace,
   })
+  const selfCareSnoozeMinutes =
+    data.selfCare.reminderPace === 'frequent'
+      ? 20
+      : data.selfCare.reminderPace === 'gentle'
+        ? 45
+        : 30
+  const selfCarePopupStatus = !data.selfCare.popupEnabled
+    ? 'Popups are muted.'
+    : selfCarePopupGraceActive
+      ? 'Quiet start is on. Popups will begin after about 2 minutes.'
+      : 'Popups are active.'
   const todayDateKey = new Date().toISOString().slice(0, 10)
   const preferredName = data.displayName.trim()
   const reminderSnoozeUntil = selfCareReminder
     ? selfCareReminder.focus === 'food'
       ? data.selfCare.foodReminderSnoozeUntil
-      : data.selfCare.waterReminderSnoozeUntil
+      : selfCareReminder.focus === 'water'
+        ? data.selfCare.waterReminderSnoozeUntil
+        : data.selfCare.postureReminderSnoozeUntil
     : null
+  const isSelfCareSessionActive = true
   const isSelfCareReminderDue =
-    Boolean(data.isWorking && selfCareReminder) &&
+    Boolean(isSelfCareSessionActive && selfCareReminder) &&
+    data.selfCare.popupEnabled &&
+    !selfCarePopupGraceActive &&
     (!reminderSnoozeUntil || Date.now() >= reminderSnoozeUntil)
   const selfCareModalText =
     selfCareModalFocus === 'food'
       ? 'Have you eaten anything today?'
-      : 'Have you had any water recently?'
+      : selfCareModalFocus === 'water'
+        ? 'Have you had any water recently?'
+        : 'Quick posture reset? Shoulders down, unclench your jaw, feet on the floor.'
   const selfCareStatus = formatLastCheck(data.selfCare.lastReset)
 
   useEffect(() => {
-    if (!data.isWorking || !selfCareReminder) {
+    if (!isSelfCareSessionActive || !selfCareReminder || !data.selfCare.popupEnabled || selfCarePopupGraceActive) {
       setSelfCareModalFocus(null)
       return
     }
@@ -1042,11 +1079,15 @@ function App() {
       setSelfCareModalFocus(selfCareReminder.focus)
     }
   }, [
-    data.isWorking,
+    isSelfCareSessionActive,
     selfCareReminder?.focus,
     isSelfCareReminderDue,
     workElapsedSeconds,
     breakElapsedSeconds,
+    pomodoroRunning,
+    bodyDoubleRunning,
+    data.selfCare.popupEnabled,
+    selfCarePopupGraceActive,
   ])
 
   const noteWrittenDate = data.windDown.noteWrittenDate
@@ -1586,14 +1627,16 @@ function App() {
         [field]: !prev.selfCare[field],
         ...(field === 'food' && !prev.selfCare.food ? { lastFoodCheck: now } : {}),
         ...(field === 'water' && !prev.selfCare.water ? { lastWaterCheck: now } : {}),
+        ...(field === 'posture' && !prev.selfCare.posture ? { lastPostureCheck: now } : {}),
         ...(field === 'food' ? { foodReminderSnoozeUntil: null } : {}),
         ...(field === 'water' ? { waterReminderSnoozeUntil: null } : {}),
+        ...(field === 'posture' ? { postureReminderSnoozeUntil: null } : {}),
         lastReset: now,
       },
     }))
   }
 
-  const completeSelfCareReminder = (focus: 'food' | 'water') => {
+  const completeSelfCareReminder = (focus: 'food' | 'water' | 'posture') => {
     const now = Date.now()
 
     setData((prev) => ({
@@ -1603,16 +1646,18 @@ function App() {
         [focus]: true,
         ...(focus === 'food'
           ? { lastFoodCheck: now, foodReminderSnoozeUntil: null }
-          : { lastWaterCheck: now, waterReminderSnoozeUntil: null }),
+          : focus === 'water'
+            ? { lastWaterCheck: now, waterReminderSnoozeUntil: null }
+            : { lastPostureCheck: now, postureReminderSnoozeUntil: null }),
         lastReset: now,
       },
     }))
     setSelfCareModalFocus(null)
   }
 
-  const snoozeSelfCareReminder = (focus: 'food' | 'water') => {
+  const snoozeSelfCareReminder = (focus: 'food' | 'water' | 'posture') => {
     const now = Date.now()
-    const snoozeUntil = now + 30 * 60 * 1000
+    const snoozeUntil = now + selfCareSnoozeMinutes * 60 * 1000
 
     setData((prev) => ({
       ...prev,
@@ -1620,7 +1665,9 @@ function App() {
         ...prev.selfCare,
         ...(focus === 'food'
           ? { foodReminderSnoozeUntil: snoozeUntil }
-          : { waterReminderSnoozeUntil: snoozeUntil }),
+          : focus === 'water'
+            ? { waterReminderSnoozeUntil: snoozeUntil }
+            : { postureReminderSnoozeUntil: snoozeUntil }),
         lastReset: now,
       },
     }))
@@ -1635,10 +1682,14 @@ function App() {
           water: false,
           food: false,
           posture: false,
+          reminderPace: prev.selfCare.reminderPace,
+          popupEnabled: prev.selfCare.popupEnabled,
           lastFoodCheck: null,
           lastWaterCheck: null,
+          lastPostureCheck: null,
           foodReminderSnoozeUntil: null,
           waterReminderSnoozeUntil: null,
+          postureReminderSnoozeUntil: null,
           lastReset: Date.now(),
         },
       }))
@@ -1671,8 +1722,10 @@ function App() {
             <p className="self-care-modal-text">{selfCareModalText}</p>
             <p className="self-care-modal-note">
               {selfCareModalFocus === 'food'
-                ? "No worries if not. I'll check in again in around 30 minutes."
-                : "No worries if not. I'll check in again in around 30 minutes while you're working."}
+                ? `No worries if not. I'll check in again in around ${selfCareSnoozeMinutes} minutes.`
+                : selfCareModalFocus === 'water'
+                  ? `No worries if not. I'll check in again in around ${selfCareSnoozeMinutes} minutes while you're using Calm Space.`
+                  : `No worries. I'll check in again in around ${selfCareSnoozeMinutes} minutes while you're using Calm Space.`}
             </p>
             <div className="self-care-modal-actions">
               <button
@@ -3137,6 +3190,105 @@ function App() {
           ) : null}
 
           <p className="meta-line">{selfCareStatus}</p>
+
+          <div className="mode-picker" aria-label="Reminder frequency">
+            <p>Reminder frequency</p>
+            <div className="chip-row">
+              <button
+                type="button"
+                className={`chip ${data.selfCare.reminderPace === 'gentle' ? 'active-chip' : ''}`}
+                onClick={() =>
+                  setData((prev) => ({
+                    ...prev,
+                    selfCare: {
+                      ...prev.selfCare,
+                      reminderPace: 'gentle',
+                    },
+                  }))
+                }
+                aria-pressed={data.selfCare.reminderPace === 'gentle'}
+              >
+                <strong>Gentle</strong>
+                <span>Fewer nudges</span>
+              </button>
+              <button
+                type="button"
+                className={`chip ${data.selfCare.reminderPace === 'standard' ? 'active-chip' : ''}`}
+                onClick={() =>
+                  setData((prev) => ({
+                    ...prev,
+                    selfCare: {
+                      ...prev.selfCare,
+                      reminderPace: 'standard',
+                    },
+                  }))
+                }
+                aria-pressed={data.selfCare.reminderPace === 'standard'}
+              >
+                <strong>Standard</strong>
+                <span>Balanced nudges</span>
+              </button>
+              <button
+                type="button"
+                className={`chip ${data.selfCare.reminderPace === 'frequent' ? 'active-chip' : ''}`}
+                onClick={() =>
+                  setData((prev) => ({
+                    ...prev,
+                    selfCare: {
+                      ...prev.selfCare,
+                      reminderPace: 'frequent',
+                    },
+                  }))
+                }
+                aria-pressed={data.selfCare.reminderPace === 'frequent'}
+              >
+                <strong>Frequent</strong>
+                <span>More nudges</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mode-picker" aria-label="Popup reminders">
+            <p>Popup reminders</p>
+            <div className="chip-row">
+              <button
+                type="button"
+                className={`chip ${data.selfCare.popupEnabled ? 'active-chip' : ''}`}
+                onClick={() =>
+                  setData((prev) => ({
+                    ...prev,
+                    selfCare: {
+                      ...prev.selfCare,
+                      popupEnabled: true,
+                    },
+                  }))
+                }
+                aria-pressed={data.selfCare.popupEnabled}
+              >
+                <strong>On</strong>
+                <span>Show reminder popups</span>
+              </button>
+              <button
+                type="button"
+                className={`chip ${!data.selfCare.popupEnabled ? 'active-chip' : ''}`}
+                onClick={() => {
+                  setSelfCareModalFocus(null)
+                  setData((prev) => ({
+                    ...prev,
+                    selfCare: {
+                      ...prev.selfCare,
+                      popupEnabled: false,
+                    },
+                  }))
+                }}
+                aria-pressed={!data.selfCare.popupEnabled}
+              >
+                <strong>Muted</strong>
+                <span>Keep reminders quiet</span>
+              </button>
+            </div>
+            <p className="mode-summary">{selfCarePopupStatus}</p>
+          </div>
 
           <ul className="checklist">
             <li>

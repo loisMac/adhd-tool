@@ -108,8 +108,66 @@ describe('toolLogic', () => {
     const now = new Date('2026-03-27T13:15:00').getTime()
     const lunchCheck = new Date('2026-03-27T12:10:00').getTime()
     const recentWater = now - 20 * 60 * 1000
+    const recentPosture = now - 35 * 60 * 1000
 
-    expect(getSelfCareReminder({ now, lastFoodCheck: lunchCheck, lastWaterCheck: recentWater })).toBe(null)
+    expect(
+      getSelfCareReminder({
+        now,
+        lastFoodCheck: lunchCheck,
+        lastWaterCheck: recentWater,
+        lastPostureCheck: recentPosture,
+      }),
+    ).toBe(null)
+  })
+
+  it('returns a posture reminder when food and water are already covered', () => {
+    const now = new Date('2026-03-27T16:00:00').getTime()
+    const recentWater = now - 20 * 60 * 1000
+
+    expect(
+      getSelfCareReminder({
+        now,
+        lastFoodCheck: now,
+        lastWaterCheck: recentWater,
+      }),
+    ).toEqual({
+      message: 'Want to do a quick posture reset?',
+      focus: 'posture',
+    })
+  })
+
+  it('uses frequent pace to nudge water sooner', () => {
+    const now = new Date('2026-03-27T16:00:00').getTime()
+    const recentWater = now - 60 * 60 * 1000
+
+    expect(
+      getSelfCareReminder({
+        now,
+        lastFoodCheck: now,
+        lastWaterCheck: recentWater,
+        reminderPace: 'frequent',
+      }),
+    ).toEqual({
+      message: 'Had some water recently?',
+      focus: 'water',
+    })
+  })
+
+  it('uses gentle pace to delay water reminders', () => {
+    const now = new Date('2026-03-27T16:00:00').getTime()
+    const recentWater = now - 60 * 60 * 1000
+
+    expect(
+      getSelfCareReminder({
+        now,
+        lastFoodCheck: now,
+        lastWaterCheck: recentWater,
+        reminderPace: 'gentle',
+      }),
+    ).toEqual({
+      message: 'Want to do a quick posture reset?',
+      focus: 'posture',
+    })
   })
 
   it('accumulates work time from a stored total and current session', () => {

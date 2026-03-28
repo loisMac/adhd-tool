@@ -166,13 +166,15 @@ export const getRescueActions = () => [
 
 type SelfCareReminder = {
   message: string
-  focus: 'food' | 'water'
+  focus: 'food' | 'water' | 'posture'
 }
 
 type SelfCareReminderInput = {
   now?: number
   lastFoodCheck?: number | null
   lastWaterCheck?: number | null
+  lastPostureCheck?: number | null
+  reminderPace?: 'gentle' | 'standard' | 'frequent'
 }
 
 const mealWindows = [
@@ -181,12 +183,24 @@ const mealWindows = [
   { label: 'dinner', startHour: 18, endHour: 21 },
 ]
 
-const WATER_INTERVAL_MS = 75 * 60 * 1000
+const WATER_INTERVAL_MS_BY_PACE = {
+  gentle: 95 * 60 * 1000,
+  standard: 75 * 60 * 1000,
+  frequent: 55 * 60 * 1000,
+}
+
+const POSTURE_INTERVAL_MS_BY_PACE = {
+  gentle: 120 * 60 * 1000,
+  standard: 95 * 60 * 1000,
+  frequent: 70 * 60 * 1000,
+}
 
 export const getSelfCareReminder = ({
   now = Date.now(),
   lastFoodCheck = null,
   lastWaterCheck = null,
+  lastPostureCheck = null,
+  reminderPace = 'standard',
 }: SelfCareReminderInput = {}): SelfCareReminder | null => {
   const current = new Date(now)
   const hour = current.getHours()
@@ -208,10 +222,20 @@ export const getSelfCareReminder = ({
   }
 
   const isDaytime = hour >= 9 && hour <= 21
-  if (isDaytime && (!lastWaterCheck || now - lastWaterCheck >= WATER_INTERVAL_MS)) {
+  const waterIntervalMs = WATER_INTERVAL_MS_BY_PACE[reminderPace]
+  const postureIntervalMs = POSTURE_INTERVAL_MS_BY_PACE[reminderPace]
+
+  if (isDaytime && (!lastWaterCheck || now - lastWaterCheck >= waterIntervalMs)) {
     return {
       message: 'Had some water recently?',
       focus: 'water',
+    }
+  }
+
+  if (isDaytime && (!lastPostureCheck || now - lastPostureCheck >= postureIntervalMs)) {
+    return {
+      message: 'Want to do a quick posture reset?',
+      focus: 'posture',
     }
   }
 
