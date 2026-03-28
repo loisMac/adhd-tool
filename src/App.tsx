@@ -702,6 +702,7 @@ function App() {
   const [pomodoroMode, setPomodoroMode] = useState<'focus' | 'rest'>('focus')
   const [workElapsedSeconds, setWorkElapsedSeconds] = useState(storedProfile.workElapsedSeconds)
   const [breakElapsedSeconds, setBreakElapsedSeconds] = useState(storedProfile.breakElapsedSeconds)
+  const [workDaySummarySeconds, setWorkDaySummarySeconds] = useState<number | null>(null)
   const [stuckRescueSecondsLeft, setStuckRescueSecondsLeft] = useState(0)
   const [activeTool, setActiveTool] = useState<ToolId>('task-chunker')
   const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
@@ -1450,6 +1451,7 @@ function App() {
 
   const startWork = () => {
     const now = Date.now()
+    setWorkDaySummarySeconds(null)
     setData((prev) => ({
       ...prev,
       workStartTime: now,
@@ -1497,6 +1499,8 @@ function App() {
   }
 
   const stopWork = () => {
+    const finalTotal = getAccumulatedWorkSeconds(data.totalWorkSeconds, data.workStartTime)
+
     setData((prev) => ({
       ...prev,
       workStartTime: null,
@@ -1508,6 +1512,7 @@ function App() {
         lastPromptText: '',
       },
     }))
+    setWorkDaySummarySeconds(finalTotal > 0 ? finalTotal : null)
     setWorkElapsedSeconds(0)
     setBreakElapsedSeconds(0)
   }
@@ -2070,6 +2075,11 @@ function App() {
                 <p className="timer-guide">
                   This covers the whole day, not just this stretch. Start it once, take breaks, and come back when you're ready.
                 </p>
+                {workDaySummarySeconds ? (
+                  <p className="timer-day-end">
+                    You worked for {formatDuration(workDaySummarySeconds)} today. Hope you had a good day.
+                  </p>
+                ) : null}
               </div>
             )}
           </div>
