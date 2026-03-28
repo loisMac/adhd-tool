@@ -2507,6 +2507,7 @@ function App() {
                   }
                 />
               </label>
+              <p className="meta-line">Separate each thought with a full stop or a new line so we can sort them one at a time.</p>
               <button
                 type="button"
                 className="btn-primary"
