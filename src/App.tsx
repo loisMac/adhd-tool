@@ -202,7 +202,7 @@ const toolTipsText: Record<ToolId, string> = {
   'transition-helper':
     'Use this quick checklist when switching tasks so your brain can catch up.',
   'stuck-rescue':
-    'If you feel stuck, pick one tiny move and do just 10 minutes.',
+    'Feel stuck and can't start? A quick physical reset, then ease into it for just 2 minutes.'
   'time-anchor':
     'Get gentle time nudges while you work, so hours do not disappear.',
   'wind-down':
@@ -1223,10 +1223,8 @@ function App() {
       stuckRescue: {
         ...prev.stuckRescue,
         chosenAction: chosen,
-        startedAt: Date.now(),
       },
     }))
-    setStuckRescueSecondsLeft(10 * 60)
   }
 
   const resetTransitionHelper = () => {
@@ -1580,7 +1578,7 @@ function App() {
             </p>
 
             <label className="name-card">
-              What should Calm Space call you?
+              What should we call you?
               <input
                 type="text"
                 placeholder="Optional"
@@ -2215,7 +2213,7 @@ function App() {
             {...getHeadingControls('stuck-rescue')}
             id="stuck-heading"
             title="Stuck rescue"
-            copy="If you freeze, choose one tiny move and try 10 minutes."
+            copy="Can't get started? A quick reset can break the paralysis."
             icon="rescue"
             category="Recover"
           />
@@ -2246,12 +2244,12 @@ function App() {
 
           <div className="button-row">
             <button type="button" className="btn-primary" onClick={chooseRescueAction}>
-              Pick one tiny move
+              Reset my stuck feeling
             </button>
             <button
               type="button"
               onClick={() => {
-                setStuckRescueSecondsLeft(10 * 60)
+                setStuckRescueSecondsLeft(2 * 60)
                 setData((prev) => ({
                   ...prev,
                   stuckRescue: { ...prev.stuckRescue, startedAt: Date.now() },
@@ -2259,7 +2257,7 @@ function App() {
               }}
               disabled={!data.stuckRescue.chosenAction}
             >
-              Start 10 min focus
+              Begin (2 min)
             </button>
           </div>
 
@@ -2275,7 +2273,7 @@ function App() {
 
           {data.stuckRescue.startedAt ? (
             <p className="meta-line" aria-live="polite">
-              10-minute commitment: {formatTime(stuckRescueSecondsLeft)} left
+              Just getting started: {formatTime(stuckRescueSecondsLeft)} left
             </p>
           ) : null}
 
