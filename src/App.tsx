@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent 
 import './App.css'
 import {
   clampNumber,
+  type ChunkTaskOptions,
   chunkTask,
   formatLastCheck,
   formatDuration,
@@ -10,6 +11,10 @@ import {
   getBreakSeconds,
   getRescueActions,
   getSelfCareReminder,
+  splitTaskClauses,
+  type TaskChunkerBlocker,
+  type TaskChunkerStepSize,
+  type TaskChunkerType,
 } from './lib/toolLogic'
 
 type TaskItem = {
@@ -72,6 +77,13 @@ type TransitionHelper = {
   nextTaskNote: string
 }
 
+type TaskChunkerState = {
+  taskType: TaskChunkerType
+  blocker: TaskChunkerBlocker
+  stepSize: TaskChunkerStepSize
+  showFollowUps: boolean
+}
+
 type StuckRescue = {
   challenge: string
   chosenAction: string
@@ -89,6 +101,7 @@ type TimeAnchor = {
 type ProfileData = {
   displayName: string
   bigTaskInput: string
+  taskChunker: TaskChunkerState
   chunkedSteps: string[]
   taskInput: string
   tasks: TaskItem[]
@@ -259,12 +272,42 @@ const themes: Array<{ id: ThemeName; label: string }> = [
   { id: 'night', label: 'Night' },
 ]
 
+const taskChunkerTypes: Array<{ id: TaskChunkerType; label: string; hint: string }> = [
+  { id: 'admin', label: 'Admin', hint: 'Forms, inboxes, life admin, logistics' },
+  { id: 'writing', label: 'Writing', hint: 'Essays, emails, posts, documents' },
+  { id: 'study', label: 'Study', hint: 'Revision, reading, homework, research' },
+  { id: 'chore', label: 'Chore', hint: 'Cleaning, tidying, practical home stuff' },
+  { id: 'life', label: 'Life errand', hint: 'Appointments, calls, booking, errands' },
+  { id: 'work', label: 'Work project', hint: 'Project tasks, client work, deliverables' },
+  { id: 'other', label: 'Something else', hint: 'Use this if it does not fit the others' },
+]
+
+const taskChunkerBlockers: Array<{ id: TaskChunkerBlocker; label: string }> = [
+  { id: 'first-step', label: 'I do not know the first step' },
+  { id: 'too-big', label: 'It feels too big' },
+  { id: 'avoiding', label: 'I am avoiding it' },
+  { id: 'prioritise', label: 'I do not know what matters first' },
+  { id: 'low-energy', label: 'I do not have much energy' },
+]
+
+const taskChunkerStepSizes: Array<{ id: TaskChunkerStepSize; label: string; hint: string }> = [
+  { id: 'tiny', label: 'Tiny', hint: '2 to 5 minutes' },
+  { id: 'small', label: 'Small', hint: '5 to 10 minutes' },
+  { id: 'normal', label: 'Normal', hint: '10 to 20 minutes' },
+]
+
 const defaultTips = (): TipsState =>
   Object.fromEntries(Object.keys(toolTipsText).map((id) => [id, true])) as TipsState
 
 const defaultData = (): ProfileData => ({
   displayName: '',
   bigTaskInput: '',
+  taskChunker: {
+    taskType: 'other',
+    blocker: 'too-big',
+    stepSize: 'small',
+    showFollowUps: false,
+  },
   chunkedSteps: [],
   taskInput: '',
   tasks: [],
@@ -430,6 +473,7 @@ const loadStoredProfile = (profileId: string) => {
           return {
             ...empty,
             ...parsed,
+            taskChunker: { ...empty.taskChunker, ...parsed.taskChunker },
             windDown: { ...empty.windDown, ...parsed.windDown },
             weeklyReview: { ...empty.weeklyReview, ...parsed.weeklyReview },
             transitionHelper: { ...empty.transitionHelper, ...parsed.transitionHelper },
@@ -982,6 +1026,7 @@ function App() {
       noteWrittenDate < todayDateKey &&
       !data.windDown.noteShown
     : false
+  const taskChunkerQuestionsOpen = data.taskChunker.showFollowUps
   const hasTaskChunkerContent = Boolean(data.bigTaskInput.trim() || data.chunkedSteps.length > 0)
   const canAddTask = data.taskInput.trim().length > 0
   const hasCompletedTasks = data.tasks.some((task) => task.done)
@@ -1083,6 +1128,56 @@ function App() {
       taskInput: '',
       tasks: [...prev.tasks, { id: Date.now(), text, done: false }],
     }))
+  }
+
+  const openTaskChunkerGuidance = () => {
+    const taskText = data.bigTaskInput.trim()
+    if (!taskText) {
+      return
+    }
+
+    const directSteps = splitTaskClauses(taskText)
+    if (directSteps.length >= 3) {
+      setData((prev) => ({
+        ...prev,
+        chunkedSteps: directSteps,
+        taskChunker: {
+          ...prev.taskChunker,
+          showFollowUps: false,
+        },
+      }))
+      return
+    }
+
+    setData((prev) => ({
+      ...prev,
+      chunkedSteps: [],
+      taskChunker: {
+        ...prev.taskChunker,
+        showFollowUps: true,
+      },
+    }))
+  }
+
+  const buildTaskChunkerSteps = (overrides: Partial<ChunkTaskOptions> = {}) => {
+    const taskText = data.bigTaskInput.trim()
+    if (!taskText) {
+      return
+    }
+
+    setData((prev) => {
+      const nextTaskChunker = {
+        ...prev.taskChunker,
+        ...overrides,
+        showFollowUps: true,
+      }
+
+      return {
+        ...prev,
+        chunkedSteps: chunkTask(taskText, nextTaskChunker),
+        taskChunker: nextTaskChunker,
+      }
+    })
   }
 
   const addWindDownItem = (text: string) => {
@@ -1282,6 +1377,10 @@ function App() {
     setData((prev) => ({
       ...prev,
       bigTaskInput: '',
+      taskChunker: {
+        ...prev.taskChunker,
+        showFollowUps: false,
+      },
       chunkedSteps: [],
     }))
   }
@@ -1885,7 +1984,15 @@ function App() {
               placeholder="Example: finish onboarding pack"
               value={data.bigTaskInput}
               onChange={(event) =>
-                setData((prev) => ({ ...prev, bigTaskInput: event.target.value }))
+                setData((prev) => ({
+                  ...prev,
+                  bigTaskInput: event.target.value,
+                  chunkedSteps: [],
+                  taskChunker: {
+                    ...prev.taskChunker,
+                    showFollowUps: false,
+                  },
+                }))
               }
             />
           </label>
@@ -1893,23 +2000,112 @@ function App() {
           <button
             type="button"
             className="btn-primary"
-            disabled={!hasTaskChunkerContent}
-            onClick={() =>
-              setData((prev) => ({
-                ...prev,
-                chunkedSteps: chunkTask(prev.bigTaskInput),
-              }))
-            }
+            disabled={!data.bigTaskInput.trim()}
+            onClick={openTaskChunkerGuidance}
           >
-            Break this into small steps
+            Help me break this down
           </button>
 
+          {taskChunkerQuestionsOpen ? (
+            <div className="task-chunker-guide">
+              <p className="meta-line">A few quick questions so the steps make more sense.</p>
+
+              <div className="task-chunker-question-group" aria-label="Task type">
+                <p>What kind of task is this?</p>
+                <div className="chip-row">
+                  {taskChunkerTypes.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`chip ${data.taskChunker.taskType === option.id ? 'active-chip' : ''}`}
+                      onClick={() =>
+                        setData((prev) => ({
+                          ...prev,
+                          taskChunker: {
+                            ...prev.taskChunker,
+                            taskType: option.id,
+                          },
+                        }))
+                      }
+                      aria-pressed={data.taskChunker.taskType === option.id}
+                    >
+                      <strong>{option.label}</strong>
+                      <span>{option.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="task-chunker-question-group" aria-label="Main blocker">
+                <p>What feels hardest right now?</p>
+                <div className="chip-row">
+                  {taskChunkerBlockers.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`chip ${data.taskChunker.blocker === option.id ? 'active-chip' : ''}`}
+                      onClick={() =>
+                        setData((prev) => ({
+                          ...prev,
+                          taskChunker: {
+                            ...prev.taskChunker,
+                            blocker: option.id,
+                          },
+                        }))
+                      }
+                      aria-pressed={data.taskChunker.blocker === option.id}
+                    >
+                      <strong>{option.label}</strong>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="task-chunker-question-group" aria-label="Step size">
+                <p>How small do you want the steps?</p>
+                <div className="chip-row">
+                  {taskChunkerStepSizes.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`chip ${data.taskChunker.stepSize === option.id ? 'active-chip' : ''}`}
+                      onClick={() =>
+                        setData((prev) => ({
+                          ...prev,
+                          taskChunker: {
+                            ...prev.taskChunker,
+                            stepSize: option.id,
+                          },
+                        }))
+                      }
+                      aria-pressed={data.taskChunker.stepSize === option.id}
+                    >
+                      <strong>{option.label}</strong>
+                      <span>{option.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="button-row">
+                <button type="button" className="btn-primary" onClick={() => buildTaskChunkerSteps()}>
+                  {data.chunkedSteps.length > 0 ? 'Rebuild with these answers' : 'Build my steps'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {data.chunkedSteps.length > 0 ? (
-            <ol className="list-output">
-              {data.chunkedSteps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
+            <>
+              {taskChunkerQuestionsOpen ? (
+                <p className="meta-line">If these still feel big, switch to Tiny and build them again.</p>
+              ) : null}
+              <ol className="list-output task-chunker-results">
+                {data.chunkedSteps.map((step, index) => (
+                  <li key={`${step}-${index}`}>{step}</li>
+                ))}
+              </ol>
+            </>
           ) : (
             <p className="empty-state">Your step-by-step plan will appear here.</p>
           )}

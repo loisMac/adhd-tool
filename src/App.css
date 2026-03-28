@@ -1186,6 +1186,45 @@ button:hover {
   font-size: 0.95rem;
 }
 
+.task-chunker-guide {
+  margin-top: 0.95rem;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 18%, var(--line-soft) 82%);
+  border-radius: 1rem;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent-soft) 34%, var(--panel-bg) 66%),
+    color-mix(in srgb, var(--panel-bg) 96%, white 4%)
+  );
+}
+
+.task-chunker-question-group + .task-chunker-question-group {
+  margin-top: 0.95rem;
+}
+
+.task-chunker-question-group p {
+  margin: 0 0 0.45rem;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.task-chunker-guide .chip {
+  min-width: min(100%, 15rem);
+}
+
+.task-chunker-results {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.task-chunker-results li {
+  padding: 0.72rem 0.78rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--panel-bg) 92%, white 8%);
+  line-height: 1.45;
+}
+
 .checklist,
 .list-output,
 .sort-grid ul {

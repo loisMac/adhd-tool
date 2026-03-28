@@ -4,6 +4,16 @@ export const formatTime = (totalSeconds: number) => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+export type TaskChunkerType = 'admin' | 'writing' | 'study' | 'chore' | 'life' | 'work' | 'other'
+export type TaskChunkerBlocker = 'first-step' | 'too-big' | 'avoiding' | 'prioritise' | 'low-energy'
+export type TaskChunkerStepSize = 'tiny' | 'small' | 'normal'
+
+export type ChunkTaskOptions = {
+  taskType?: TaskChunkerType
+  blocker?: TaskChunkerBlocker
+  stepSize?: TaskChunkerStepSize
+}
+
 const summarizeInput = (input: string, maxLength = 60) => {
   const cleaned = input.replace(/\s+/g, ' ').trim().replace(/[.!?,;:]+$/, '')
 
@@ -14,6 +24,101 @@ const summarizeInput = (input: string, maxLength = 60) => {
   return `${cleaned.slice(0, maxLength - 3).trimEnd()}...`
 }
 
+const sizeLabels: Record<TaskChunkerStepSize, string> = {
+  tiny: '2 to 5 minutes',
+  small: '5 to 10 minutes',
+  normal: '10 to 20 minutes',
+}
+
+export const splitTaskClauses = (input: string) =>
+  input
+    .trim()
+    .split(/\n|[.;]+|,(?=\s*[a-z0-9])/gi)
+    .map((step) => step.trim().replace(/^[\-•\d.)\s]+/, '').replace(/[.!?,;:]+$/, ''))
+    .filter(Boolean)
+
+const buildBlockerSteps = (
+  focus: string,
+  blocker: TaskChunkerBlocker,
+  stepSize: TaskChunkerStepSize,
+) => {
+  const duration = sizeLabels[stepSize]
+
+  switch (blocker) {
+    case 'first-step':
+      return [
+        `Open the main thing connected to "${focus}" and just look at it.`,
+        'Put the first thing you need in front of you so there is only one place to begin.',
+      ]
+    case 'too-big':
+      return [
+        `Write one sentence about what "${focus}" looks like when it is done.`,
+        `Pick one part of "${focus}" that you could work on for ${duration}.`,
+      ]
+    case 'avoiding':
+      return [
+        `Open what you need for "${focus}" and stay with it for 30 seconds without trying to finish it.`,
+        `Set a ${duration} timer and only aim to get yourself moving, not to finish the whole thing.`,
+      ]
+    case 'prioritise':
+      return [
+        `List the 3 parts of "${focus}" that feel most important or most urgent.`,
+        'Choose the part with the nearest deadline, biggest consequence, or lowest effort to start.',
+      ]
+    case 'low-energy':
+      return [
+        `Choose the easiest version of "${focus}" you could manage today.`,
+        `Set yourself up to do one ${duration} step sitting down, slowly, with as little friction as possible.`,
+      ]
+  }
+}
+
+const buildTaskTypeSteps = (
+  focus: string,
+  taskType: TaskChunkerType,
+  stepSize: TaskChunkerStepSize,
+) => {
+  const duration = sizeLabels[stepSize]
+
+  switch (taskType) {
+    case 'admin':
+      return [
+        `Do one admin action for "${focus}", like opening one form, checking one date, or replying to one message.`,
+        'Leave yourself a note for the next admin action before you stop.',
+      ]
+    case 'writing':
+      return [
+        `Open a doc and write a rough sentence or bullet list for one part of "${focus}".`,
+        `Keep going for ${duration}, then stop and note the next sentence, point, or paragraph to return to.`,
+      ]
+    case 'study':
+      return [
+        `Pick one section, question, or page linked to "${focus}" and work only on that.`,
+        `Write one short note about what to study next after this ${duration} block.`,
+      ]
+    case 'chore':
+      return [
+        `Get the supplies you need and do one visible pass of "${focus}" in a single area only.`,
+        `Stop after ${duration} or one small zone, then decide whether to continue or call that enough for now.`,
+      ]
+    case 'life':
+      return [
+        `Do the first real-world action for "${focus}", like checking details, making the call, or sending the message.`,
+        `Write down anything you still need so the next step is easier later.`,
+      ]
+    case 'work':
+      return [
+        `Open the doc, board, inbox, or file for "${focus}" and complete one meaningful piece of it.`,
+        `Stop after ${duration} and leave a clear next-step note for future you.`,
+      ]
+    case 'other':
+      return [
+        `Do the smallest visible part of "${focus}" that would move it forward today.`,
+        `When you stop, write the very next step so you do not have to figure it out again later.`,
+      ]
+  }
+}
+
 export const formatDuration = (totalSeconds: number) => {
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
@@ -22,28 +127,27 @@ export const formatDuration = (totalSeconds: number) => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-export const chunkTask = (input: string) => {
+export const chunkTask = (input: string, options: ChunkTaskOptions = {}) => {
   const cleaned = input.trim()
 
   if (!cleaned) {
     return []
   }
 
-  const splitByClauses = cleaned
-    .split(/\n|\.|;|,|\band\b|\bthen\b/gi)
-    .map((step) => step.trim())
-    .filter(Boolean)
+  const splitByClauses = splitTaskClauses(cleaned)
 
   if (splitByClauses.length >= 3) {
     return splitByClauses
   }
 
   const focus = summarizeInput(cleaned)
+  const taskType = options.taskType ?? 'other'
+  const blocker = options.blocker ?? 'too-big'
+  const stepSize = options.stepSize ?? 'small'
 
   return [
-    `Write what "${focus}" looks like when it is done.`,
-    `Pick the first 5 to 10 minute piece of "${focus}".`,
-    `Start a short timer and do only that first piece of "${focus}".`,
+    ...buildBlockerSteps(focus, blocker, stepSize),
+    ...buildTaskTypeSteps(focus, taskType, stepSize),
   ]
 }
 

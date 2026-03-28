@@ -9,6 +9,7 @@ import {
   getBreakSeconds,
   getRescueActions,
   getSelfCareReminder,
+  splitTaskClauses,
 } from './toolLogic'
 
 describe('toolLogic', () => {
@@ -20,11 +21,33 @@ describe('toolLogic', () => {
     ])
   })
 
-  it('falls back to gentle starter steps for short input', () => {
+  it('uses guided steps for a short input when context is provided', () => {
+    expect(
+      chunkTask('finish taxes', {
+        taskType: 'admin',
+        blocker: 'first-step',
+        stepSize: 'tiny',
+      }),
+    ).toEqual([
+      'Open the main thing connected to "finish taxes" and just look at it.',
+      'Put the first thing you need in front of you so there is only one place to begin.',
+      'Do one admin action for "finish taxes", like opening one form, checking one date, or replying to one message.',
+      'Leave yourself a note for the next admin action before you stop.',
+    ])
+  })
+
+  it('falls back to guided steps with default context for short input', () => {
     expect(chunkTask('finish taxes')).toEqual([
-      'Write what "finish taxes" looks like when it is done.',
-      'Pick the first 5 to 10 minute piece of "finish taxes".',
-      'Start a short timer and do only that first piece of "finish taxes".',
+      'Write one sentence about what "finish taxes" looks like when it is done.',
+      'Pick one part of "finish taxes" that you could work on for 5 to 10 minutes.',
+      'Do the smallest visible part of "finish taxes" that would move it forward today.',
+      'When you stop, write the very next step so you do not have to figure it out again later.',
+    ])
+  })
+
+  it('does not split normal sentences on every use of and', () => {
+    expect(splitTaskClauses('research ADHD and autism accommodations')).toEqual([
+      'research ADHD and autism accommodations',
     ])
   })
 
