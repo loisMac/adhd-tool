@@ -477,11 +477,11 @@ button:disabled:hover {
 }
 
 .theme-moss {
-  background: linear-gradient(140deg, #d6e3d3, #eef4ea);
+  background: linear-gradient(140deg, #d5dfc9, #edf0e5);
 }
 
 .theme-ocean {
-  background: linear-gradient(140deg, #d5e4e8, #edf5f6);
+  background: linear-gradient(140deg, #c8d8e8, #e8eff7);
 }
 
 .theme-night {
