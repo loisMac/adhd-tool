@@ -1103,8 +1103,8 @@ function App() {
   const selfCarePopupStatus = !data.selfCare.popupEnabled
     ? 'Popups are muted.'
     : selfCarePopupGraceActive
-      ? 'Quiet start is on. Popups will begin after about 2 minutes.'
-      : 'Popups are active.'
+      ? 'Quiet start is automatic for your first 2 minutes on Calm Space.'
+      : null
   const todayDateKey = new Date().toISOString().slice(0, 10)
   const preferredName = data.displayName.trim()
   const reminderSnoozeUntil = selfCareReminder
@@ -3405,7 +3405,7 @@ function App() {
                 <span>Keep reminders quiet</span>
               </button>
             </div>
-            <p className="mode-summary">{selfCarePopupStatus}</p>
+            {selfCarePopupStatus ? <p className="mode-summary">{selfCarePopupStatus}</p> : null}
           </div>
 
           <ul className="checklist">
