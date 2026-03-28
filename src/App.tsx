@@ -482,7 +482,7 @@ const formatCurrency = (amount: number) =>
 const companionLines = [
   'Still here with you. Keep it small and steady.',
   'You don’t need to finish everything. Just this bit.',
-  'Got distracted? No worries. Welcome back — start again now.',
+  'Got distracted? No worries. Welcome back, start again now.',
   'Take a breath, then just two more minutes.',
   'Quiet progress counts too.',
 ]
@@ -1700,7 +1700,7 @@ function App() {
         <ol>
           <li>
             <strong>Set up your day</strong>
-            <span>Pick a mode and theme if you like. Totally optional — defaults are fine.</span>
+            <span>Pick a mode and theme if you like. Totally optional, defaults are fine.</span>
           </li>
           <li>
             <strong>Do one small thing</strong>
@@ -1708,7 +1708,7 @@ function App() {
           </li>
           <li>
             <strong>Protect your energy</strong>
-            <span>Turn on the work timer and actually take breaks before you run out.</span>
+            <span>Turn on the work timer and actually take breaks before you run out of steam.</span>
           </li>
         </ol>
       </section>
@@ -2081,7 +2081,7 @@ function App() {
             <p className="empty-state">Add a few tasks, then let this pick one for you.</p>
           )}
 
-          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
+          <p className="meta-line">Saved on this device only. Won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasNextTaskContent} onClick={resetNextTask}>
             Clear this tool
@@ -2564,7 +2564,7 @@ function App() {
               {pendingBrainDumpItems.length > 0 ? (
                 <>
                   <p className="meta-line">
-                    {pendingBrainDumpItems.length} left to place — do it today, park it, or let it go
+                    {pendingBrainDumpItems.length} left to place. Do it today, park it, or let it go
                   </p>
                   <ul className="triage-list">
                     {pendingBrainDumpItems.map((item) => (
@@ -2636,7 +2636,7 @@ function App() {
             </>
           )}
 
-          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
+          <p className="meta-line">Saved on this device only. Won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasBrainDumpContent} onClick={resetBrainDump}>
             Clear this tool
@@ -2734,7 +2734,7 @@ function App() {
             />
           </label>
 
-          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
+          <p className="meta-line">Saved on this device only. Won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasWeeklyReviewContent} onClick={resetWeeklyReview}>
             Clear this tool
@@ -3026,7 +3026,7 @@ function App() {
             />
           </label>
 
-          <p className="meta-line">Saved on this device only — won't follow you to a new browser or device.</p>
+          <p className="meta-line">Saved on this device only. Won't follow you to a new browser or device.</p>
 
           <button type="button" className="btn-clear" disabled={!hasWindDownContent} onClick={resetWindDown}>
             Clear this tool
