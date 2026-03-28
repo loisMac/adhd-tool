@@ -558,6 +558,32 @@ const lowercaseFirst = (text: string) => {
   return `${text.charAt(0).toLowerCase()}${text.slice(1)}`
 }
 
+const parsePositiveWholeNumber = (value: string) => {
+  if (!/^\d+$/.test(value.trim())) {
+    return null
+  }
+
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return null
+  }
+
+  return parsed
+}
+
+const parseCycleLimitValue = (value: string) => {
+  if (!/^\d+$/.test(value.trim())) {
+    return null
+  }
+
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return null
+  }
+
+  return parsed
+}
+
 const playToneSequence = (tones: number[], duration = 0.14, gap = 0.05) => {
   try {
     const AudioCtor = globalThis.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -681,6 +707,9 @@ function App() {
   const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
   const [selfCareModalFocus, setSelfCareModalFocus] = useState<'food' | 'water' | 'posture' | null>(null)
   const [selfCarePopupGraceActive, setSelfCarePopupGraceActive] = useState(true)
+  const [pomodoroWorkInput, setPomodoroWorkInput] = useState(() => String(storedProfile.data.pomodoroWork))
+  const [pomodoroRestInput, setPomodoroRestInput] = useState(() => String(storedProfile.data.pomodoroRest))
+  const [pomodoroCycleLimitInput, setPomodoroCycleLimitInput] = useState(() => String(storedProfile.data.pomodoroCycleLimit))
   const [essentialsOnly, setEssentialsOnly] = useState<boolean>(() => loadStoredEssentialsOnly())
   const [toolView, setToolView] = useState<ToolView>(() => loadStoredToolView())
   const [singleToolId, setSingleToolId] = useState<ToolId>(() => loadStoredSingleTool())
@@ -791,6 +820,18 @@ function App() {
 
     return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    setPomodoroWorkInput(String(data.pomodoroWork))
+  }, [data.pomodoroWork])
+
+  useEffect(() => {
+    setPomodoroRestInput(String(data.pomodoroRest))
+  }, [data.pomodoroRest])
+
+  useEffect(() => {
+    setPomodoroCycleLimitInput(String(data.pomodoroCycleLimit))
+  }, [data.pomodoroCycleLimit])
 
   useEffect(() => {
     if (!bodyDoubleRunning) {
@@ -1197,19 +1238,84 @@ function App() {
   }
 
   const startPomodoro = () => {
+    const nextWork = parsePositiveWholeNumber(pomodoroWorkInput)
+    const nextRest = parsePositiveWholeNumber(pomodoroRestInput)
+    const nextCycleLimit = parseCycleLimitValue(pomodoroCycleLimitInput)
+
+    if (!nextWork || !nextRest || nextCycleLimit === null) {
+      setPomodoroWorkInput(String(data.pomodoroWork))
+      setPomodoroRestInput(String(data.pomodoroRest))
+      setPomodoroCycleLimitInput(String(data.pomodoroCycleLimit))
+      return
+    }
+
     const shouldRestartCycleCount =
-      data.pomodoroCycleLimit > 0 && data.pomodoroCyclesCompleted >= data.pomodoroCycleLimit
+      nextCycleLimit > 0 && data.pomodoroCyclesCompleted >= nextCycleLimit
+
+    setData((prev) => ({
+      ...prev,
+      pomodoroWork: nextWork,
+      pomodoroRest: nextRest,
+      pomodoroCycleLimit: nextCycleLimit,
+      pomodoroSecondsLeft:
+        shouldRestartCycleCount || prev.pomodoroSecondsLeft === prev.pomodoroWork * 60
+          ? nextWork * 60
+          : pomodoroMode === 'rest' && prev.pomodoroSecondsLeft === prev.pomodoroRest * 60
+            ? nextRest * 60
+            : prev.pomodoroSecondsLeft,
+      pomodoroCyclesCompleted: shouldRestartCycleCount ? 0 : prev.pomodoroCyclesCompleted,
+    }))
 
     if (shouldRestartCycleCount) {
       setPomodoroMode('focus')
-      setData((prev) => ({
-        ...prev,
-        pomodoroCyclesCompleted: 0,
-        pomodoroSecondsLeft: prev.pomodoroWork * 60,
-      }))
     }
 
     setPomodoroRunning(true)
+  }
+
+  const commitPomodoroWork = () => {
+    const next = parsePositiveWholeNumber(pomodoroWorkInput)
+    if (!next) {
+      setPomodoroWorkInput(String(data.pomodoroWork))
+      return
+    }
+
+    setData((prev) => ({
+      ...prev,
+      pomodoroWork: next,
+      pomodoroSecondsLeft:
+        pomodoroMode === 'focus' && !pomodoroRunning ? next * 60 : prev.pomodoroSecondsLeft,
+    }))
+  }
+
+  const commitPomodoroRest = () => {
+    const next = parsePositiveWholeNumber(pomodoroRestInput)
+    if (!next) {
+      setPomodoroRestInput(String(data.pomodoroRest))
+      return
+    }
+
+    setData((prev) => ({
+      ...prev,
+      pomodoroRest: next,
+      pomodoroSecondsLeft:
+        pomodoroMode === 'rest' && !pomodoroRunning ? next * 60 : prev.pomodoroSecondsLeft,
+    }))
+  }
+
+  const commitPomodoroCycleLimit = () => {
+    const next = parseCycleLimitValue(pomodoroCycleLimitInput)
+    if (next === null) {
+      setPomodoroCycleLimitInput(String(data.pomodoroCycleLimit))
+      return
+    }
+
+    setData((prev) => ({
+      ...prev,
+      pomodoroCycleLimit: next,
+      pomodoroCyclesCompleted:
+        next > 0 ? Math.min(prev.pomodoroCyclesCompleted, next) : prev.pomodoroCyclesCompleted,
+    }))
   }
 
   const addTask = () => {
@@ -3076,19 +3182,11 @@ function App() {
               Focus minutes
               <input
                 type="number"
-                min={10}
-                max={90}
-                value={data.pomodoroWork}
-                onChange={(event) => {
-                  const next = clampNumber(Number(event.target.value), 10, 90)
-
-                  setData((prev) => ({
-                    ...prev,
-                    pomodoroWork: next,
-                    pomodoroSecondsLeft:
-                      pomodoroMode === 'focus' ? next * 60 : prev.pomodoroSecondsLeft,
-                  }))
-                }}
+                min={1}
+                step={1}
+                value={pomodoroWorkInput}
+                onChange={(event) => setPomodoroWorkInput(event.target.value)}
+                onBlur={commitPomodoroWork}
               />
             </label>
 
@@ -3096,19 +3194,11 @@ function App() {
               Rest minutes
               <input
                 type="number"
-                min={5}
-                max={45}
-                value={data.pomodoroRest}
-                onChange={(event) => {
-                  const next = clampNumber(Number(event.target.value), 5, 45)
-
-                  setData((prev) => ({
-                    ...prev,
-                    pomodoroRest: next,
-                    pomodoroSecondsLeft:
-                      pomodoroMode === 'rest' ? next * 60 : prev.pomodoroSecondsLeft,
-                  }))
-                }}
+                min={1}
+                step={1}
+                value={pomodoroRestInput}
+                onChange={(event) => setPomodoroRestInput(event.target.value)}
+                onBlur={commitPomodoroRest}
               />
             </label>
 
@@ -3117,16 +3207,10 @@ function App() {
               <input
                 type="number"
                 min={0}
-                max={12}
-                value={data.pomodoroCycleLimit}
-                onChange={(event) => {
-                  const next = clampNumber(Number(event.target.value), 0, 12)
-
-                  setData((prev) => ({
-                    ...prev,
-                    pomodoroCycleLimit: next,
-                  }))
-                }}
+                step={1}
+                value={pomodoroCycleLimitInput}
+                onChange={(event) => setPomodoroCycleLimitInput(event.target.value)}
+                onBlur={commitPomodoroCycleLimit}
               />
             </label>
           </div>
