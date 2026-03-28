@@ -121,6 +121,8 @@ type ProfileData = {
   timeAnchor: TimeAnchor
   pomodoroWork: number
   pomodoroRest: number
+  pomodoroCycleLimit: number
+  pomodoroCyclesCompleted: number
   pomodoroSecondsLeft: number
   workStartTime: number | null
   breakStartTime: number | null
@@ -354,6 +356,8 @@ const defaultData = (): ProfileData => ({
   },
   pomodoroWork: 35,
   pomodoroRest: 12,
+  pomodoroCycleLimit: 0,
+  pomodoroCyclesCompleted: 0,
   pomodoroSecondsLeft: 35 * 60,
   workStartTime: null,
   breakStartTime: null,
@@ -800,14 +804,39 @@ function App() {
     const timer = window.setInterval(() => {
       setData((prev) => {
         if (prev.pomodoroSecondsLeft <= 1) {
-          const nextMode = pomodoroMode === 'focus' ? 'rest' : 'focus'
-          setPomodoroMode(nextMode)
-          playToneSequence(nextMode === 'rest' ? [392, 523.25] : [440, 659.25])
+          if (pomodoroMode === 'focus') {
+            setPomodoroMode('rest')
+            playToneSequence([523.25, 659.25])
+
+            return {
+              ...prev,
+              pomodoroSecondsLeft: prev.pomodoroRest * 60,
+            }
+          }
+
+          const nextCyclesCompleted = prev.pomodoroCyclesCompleted + 1
+          const cycleLimitReached =
+            prev.pomodoroCycleLimit > 0 && nextCyclesCompleted >= prev.pomodoroCycleLimit
+
+          if (cycleLimitReached) {
+            setPomodoroRunning(false)
+            setPomodoroMode('focus')
+            playToneSequence([392, 523.25, 659.25])
+
+            return {
+              ...prev,
+              pomodoroCyclesCompleted: nextCyclesCompleted,
+              pomodoroSecondsLeft: prev.pomodoroWork * 60,
+            }
+          }
+
+          setPomodoroMode('focus')
+          playToneSequence([392, 523.25])
 
           return {
             ...prev,
-            pomodoroSecondsLeft:
-              nextMode === 'focus' ? prev.pomodoroWork * 60 : prev.pomodoroRest * 60,
+            pomodoroCyclesCompleted: nextCyclesCompleted,
+            pomodoroSecondsLeft: prev.pomodoroWork * 60,
           }
         }
 
@@ -1049,7 +1078,15 @@ function App() {
   const hasBrainDumpContent = data.brainDumpInput.trim().length > 0 || data.brainDumpItems.length > 0
   const hasWeeklyReviewContent = Object.values(data.weeklyReview).some((item) => item.trim().length > 0)
   const hasPomodoroDeviation =
-    pomodoroRunning || pomodoroMode !== 'focus' || data.pomodoroSecondsLeft !== data.pomodoroWork * 60
+    pomodoroRunning ||
+    pomodoroMode !== 'focus' ||
+    data.pomodoroSecondsLeft !== data.pomodoroWork * 60 ||
+    data.pomodoroCycleLimit !== 0 ||
+    data.pomodoroCyclesCompleted !== 0
+  const pomodoroCycleSummary =
+    data.pomodoroCycleLimit > 0
+      ? `${data.pomodoroCyclesCompleted}/${data.pomodoroCycleLimit} cycles completed`
+      : `${data.pomodoroCyclesCompleted} cycles completed`
   const hasBodyDoublingDeviation =
     bodyDoubleRunning || data.bodyDoubleSecondsLeft !== data.bodyDoubleMinutes * 60
   const hasSelfCareContent = data.selfCare.water || data.selfCare.food || data.selfCare.posture
@@ -1113,8 +1150,25 @@ function App() {
       bodyDoubleSecondsLeft: chosen.bodyDouble * 60,
       pomodoroWork: chosen.focus,
       pomodoroRest: chosen.rest,
+      pomodoroCyclesCompleted: 0,
       pomodoroSecondsLeft: chosen.focus * 60,
     }))
+  }
+
+  const startPomodoro = () => {
+    const shouldRestartCycleCount =
+      data.pomodoroCycleLimit > 0 && data.pomodoroCyclesCompleted >= data.pomodoroCycleLimit
+
+    if (shouldRestartCycleCount) {
+      setPomodoroMode('focus')
+      setData((prev) => ({
+        ...prev,
+        pomodoroCyclesCompleted: 0,
+        pomodoroSecondsLeft: prev.pomodoroWork * 60,
+      }))
+    }
+
+    setPomodoroRunning(true)
   }
 
   const addTask = () => {
@@ -1516,6 +1570,8 @@ function App() {
     setPomodoroMode('focus')
     setData((prev) => ({
       ...prev,
+      pomodoroCycleLimit: 0,
+      pomodoroCyclesCompleted: 0,
       pomodoroSecondsLeft: prev.pomodoroWork * 60,
     }))
   }
@@ -2962,7 +3018,7 @@ function App() {
             change the timings to fit your energy.
           </p>
 
-          <div className="double-input">
+          <div className="triple-input">
             <label>
               Focus minutes
               <input
@@ -3002,16 +3058,35 @@ function App() {
                 }}
               />
             </label>
+
+            <label>
+              Cycle limit
+              <input
+                type="number"
+                min={0}
+                max={12}
+                value={data.pomodoroCycleLimit}
+                onChange={(event) => {
+                  const next = clampNumber(Number(event.target.value), 0, 12)
+
+                  setData((prev) => ({
+                    ...prev,
+                    pomodoroCycleLimit: next,
+                  }))
+                }}
+              />
+            </label>
           </div>
 
           <p className="mode-label">Current mode: {pomodoroMode === 'focus' ? 'Focus' : 'Rest'}</p>
+          <p className="mode-label">{pomodoroCycleSummary}. Set 0 to keep cycling until you stop it.</p>
 
           <p className="timer" aria-live="polite">
             {formatTime(data.pomodoroSecondsLeft)}
           </p>
 
           <div className="button-row">
-            <button type="button" className="btn-primary" onClick={() => setPomodoroRunning(true)}>
+            <button type="button" className="btn-primary" onClick={startPomodoro}>
               Start
             </button>
             <button type="button" onClick={() => setPomodoroRunning(false)}>
