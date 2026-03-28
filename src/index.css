@@ -76,20 +76,20 @@
 }
 
 :root[data-theme='blush'] {
-  --bg: #f7eff5;
-  --panel-bg: #faf3f8;
-  --line-soft: #e8d8e8;
-  --line-strong: #cbafc2;
-  --ink-strong: #3d2d32;
-  --ink-soft: #6b4d5c;
-  --ink-muted: #8b7a84;
-  --accent-strong: #a76b7d;
-  --accent-soft: #f0d5e6;
-  --action-soft: #ede0eb;
-  --action-soft-hover: #dcc8e0;
-  --focus-ring: #926180;
-  --bg-glow-a: rgba(167, 107, 125, 0.14);
-  --bg-glow-b: rgba(180, 120, 140, 0.12);
+  --bg: #f5edf1;
+  --panel-bg: #faf5f8;
+  --line-soft: #e4cdd8;
+  --line-strong: #c29daf;
+  --ink-strong: #42293d;
+  --ink-soft: #744d63;
+  --ink-muted: #9b7d8f;
+  --accent-strong: #b85a78;
+  --accent-soft: #f0d0dd;
+  --action-soft: #ead5e3;
+  --action-soft-hover: #d9bdd0;
+  --focus-ring: #a24769;
+  --bg-glow-a: rgba(184, 90, 120, 0.16);
+  --bg-glow-b: rgba(174, 93, 125, 0.13);
   --grid-line: rgba(250, 243, 248, 0.5);
 }
 
