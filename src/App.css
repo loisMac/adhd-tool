@@ -406,6 +406,22 @@ button:disabled:hover {
   cursor: pointer;
   font-weight: 700;
   color: var(--ink-strong);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.setup-details summary::before {
+  content: '›';
+  font-size: 1.25em;
+  font-weight: 300;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.setup-details[open] summary::before {
+  transform: rotate(90deg);
 }
 
 .setup-note {
