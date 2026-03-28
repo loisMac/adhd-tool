@@ -76,6 +76,7 @@ type StuckRescue = {
   challenge: string
   chosenAction: string
   startedAt: number | null
+  durationSeconds: number
 }
 
 type TimeAnchor = {
@@ -200,15 +201,15 @@ const toolTipsText: Record<ToolId, string> = {
     'Pick a short session and start. Pause whenever you need to.',
   'next-task': 'Keep this list short. The button picks one next step for you.',
   'transition-helper':
-    'Use this quick checklist when switching tasks so your brain can catch up.',
+    'A quick tick-through when switching tasks, so your brain has a chance to catch up.',
   'stuck-rescue':
     'Feel stuck and can\'t start? A quick physical reset, then ease into it for just 2 minutes.',
   'time-anchor':
-    'Get gentle time nudges while you work, so hours do not disappear.',
+    'Gentle nudges while you work, so hours don\'t just disappear on you.',
   'wind-down':
     'Use this to close your day without overthinking it.',
   'money-tracker':
-    'Log invoices as you send them so you can quickly see what is paid and what is not.',
+    'Log as you send. That way you always know what\'s waiting to be paid.',
   'brain-dump': 'Get it all out, then sort each thought: do today, park for later, or let go.',
   'weekly-review':
     'Short answers are enough. Just notice what helped and what did not.',
@@ -299,6 +300,7 @@ const defaultData = (): ProfileData => ({
     challenge: '',
     chosenAction: '',
     startedAt: null,
+    durationSeconds: 0,
   },
   timeAnchor: {
     intervalMinutes: 30,
@@ -478,11 +480,11 @@ const formatCurrency = (amount: number) =>
   }).format(amount)
 
 const companionLines = [
-  'I am here with you. Keep it small and steady.',
-  'You do not need to finish everything. Just this step.',
-  'If you got distracted, welcome back. Start again now.',
-  'Breathe, then continue for 2 more minutes.',
-  'Quiet progress still counts.',
+  'Still here with you. Keep it small and steady.',
+  'You don’t need to finish everything. Just this bit.',
+  'Got distracted? No worries. Welcome back — start again now.',
+  'Take a breath, then just two more minutes.',
+  'Quiet progress counts too.',
 ]
 
 const formatClock = (timestamp: number) =>
@@ -796,12 +798,12 @@ function App() {
 
     const timer = window.setInterval(() => {
       const elapsed = Math.floor((Date.now() - data.stuckRescue.startedAt!) / 1000)
-      const left = Math.max(0, 10 * 60 - elapsed)
+      const left = Math.max(0, data.stuckRescue.durationSeconds - elapsed)
       setStuckRescueSecondsLeft(left)
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [data.stuckRescue.startedAt])
+  }, [data.stuckRescue.startedAt, data.stuckRescue.durationSeconds])
 
   useEffect(() => {
     if (!data.isWorking) {
@@ -952,8 +954,8 @@ function App() {
     (!reminderSnoozeUntil || Date.now() >= reminderSnoozeUntil)
   const selfCareModalText =
     selfCareModalFocus === 'food'
-      ? 'Quick check-in. Have you had something to eat?'
-      : 'Quick check-in. Have you had some water recently?'
+      ? 'Have you eaten anything today?'
+      : 'Have you had any water recently?'
   const selfCareStatus = formatLastCheck(data.selfCare.lastReset)
 
   useEffect(() => {
@@ -1250,6 +1252,7 @@ function App() {
           challenge: '',
           chosenAction: '',
           startedAt: null,
+          durationSeconds: 0,
         },
       }))
       setStuckRescueSecondsLeft(0)
@@ -1499,7 +1502,7 @@ function App() {
 
       <section className="timer-info" aria-label="Work timer explanation">
         <p>
-          {preferredName ? `Welcome, ${preferredName}. ` : 'Welcome. '}Take what helps and leave what does not. Calm Space is here to make your day feel a bit easier, one small step at a time.
+          {preferredName ? `Welcome, ${preferredName}. ` : 'Welcome. '}Take whatever helps and ignore what doesn’t. It’s here whenever you need it.
         </p>
       </section>
 
@@ -1512,8 +1515,8 @@ function App() {
             <p className="self-care-modal-text">{selfCareModalText}</p>
             <p className="self-care-modal-note">
               {selfCareModalFocus === 'food'
-                ? 'If not yet, that is okay. I will check again in about 30 minutes.'
-                : 'If not yet, that is okay. I will check again in about 30 minutes while you are working.'}
+                ? 'No worries if not. I\'ll check in again in around 30 minutes.'
+                : 'No worries if not. I\'ll check in again in around 30 minutes while you\'re working.'}
             </p>
             <div className="self-care-modal-actions">
               <button
@@ -1573,8 +1576,7 @@ function App() {
             <p className="eyebrow">Calm Space Toolkit</p>
             <h1>Simple tools for work and daily life.</h1>
             <p className="intro">
-              Built by a neurodivergent person for neurodivergent people. No jargon, no pressure,
-              just simple tools to help you start, keep going, and switch off.
+              Made by a neurodivergent person, for neurodivergent people. No jargon, no pressure, just simple tools to help you start, keep going, and actually stop at the end of the day.
             </p>
 
             <label className="name-card">
@@ -1603,7 +1605,7 @@ function App() {
             </p>
 
             <div className="mode-picker">
-              <p>Pick your day mode</p>
+              <p>How’s your energy today?</p>
               <div className="chip-row">
                 {dayModes.map((mode) => (
                   <button
@@ -1643,7 +1645,7 @@ function App() {
             </div>
 
             <div className="tool-set-picker">
-              <p>Tool set</p>
+              <p>How much do you want to see?</p>
               <div className="chip-row">
                 <button
                   type="button"
@@ -1667,7 +1669,7 @@ function App() {
             </div>
 
             <div className="view-picker">
-              <p>How to view tools</p>
+              <p>How do you want to navigate?</p>
               <div className="chip-row">
                 <button
                   type="button"
@@ -1698,15 +1700,15 @@ function App() {
         <ol>
           <li>
             <strong>Set up your day</strong>
-            <span>Use the optional setup to pick your mode, tools, and view style.</span>
+            <span>Pick a mode and theme if you like. Totally optional — defaults are fine.</span>
           </li>
           <li>
             <strong>Do one small thing</strong>
-            <span>Start with What Next and choose one manageable step.</span>
+            <span>Open What Next and pick just one thing to do. That's enough to start.</span>
           </li>
           <li>
             <strong>Protect your energy</strong>
-            <span>Start the work boundary tracker and pause before you hit empty.</span>
+            <span>Turn on the work timer and actually take breaks before you run out.</span>
           </li>
         </ol>
       </section>
@@ -1714,8 +1716,8 @@ function App() {
       <section id="work-boundary" className="work-boundary" aria-label="Work boundary tracker">
         <h2>Work boundary tracker</h2>
         <p className="work-boundary-copy">
-          It is easy to slip into overtime by accident. This tracks your full workday so you can
-          spot when it is getting long and take a break.
+          It’s really easy to work way too long without noticing. This just keeps an eye on your day
+          so you can see when it’s getting long and actually stop.
         </p>
 
         <section className="work-timer-bar" aria-label="Work session tracker">
@@ -1727,8 +1729,7 @@ function App() {
                   <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
                   <p className="timer-meta">Currently working</p>
                   <p className="timer-guide">
-                    This tracks the whole day, not just the current stretch. Start once, pause for
-                    breaks, then resume where you left off.
+                    This covers the whole day, not just this stretch. Start it once, take breaks, and come back when you're ready.
                   </p>
                 </div>
               </>
@@ -1739,8 +1740,7 @@ function App() {
                   <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
                   <p className="timer-meta">On break for {formatTime(breakElapsedSeconds)}</p>
                   <p className="timer-guide">
-                    This tracks the whole day, not just the current stretch. Start once, pause for
-                    breaks, then resume where you left off.
+                    This covers the whole day, not just this stretch. Start it once, take breaks, and come back when you're ready.
                   </p>
                 </div>
               </>
@@ -1750,8 +1750,7 @@ function App() {
                 <p className="timer-time">{formatDuration(workElapsedSeconds)}</p>
                 <p className="timer-meta">Ready to start</p>
                 <p className="timer-guide">
-                  This tracks the whole day, not just the current stretch. Start once, pause for
-                  breaks, then resume where you left off.
+                  This covers the whole day, not just this stretch. Start it once, take breaks, and come back when you're ready.
                 </p>
               </div>
             )}
@@ -1790,8 +1789,8 @@ function App() {
         <div className="jump-nav-head">
           <p>
             {toolView === 'single'
-              ? 'One tool view is on. Use the list below to switch tools.'
-              : 'Choose a tool to start. If you are unsure, begin with What Next.'}
+              ? 'You’re in one-tool view. Tap below to switch tools.'
+              : 'Choose a tool to start. If you’re not sure, begin with What Next.'}
           </p>
           <span className="jump-status">Now viewing: {activeToolLabel}</span>
         </div>
@@ -1924,7 +1923,7 @@ function App() {
             {...getHeadingControls('body-doubling')}
             id="body-double-heading"
             title="Body doubling timer"
-            copy="Set a timer and work with a companion."
+            copy="Set a timer and work alongside a virtual companion."
             icon="double"
             category="Focus"
           />
@@ -2094,7 +2093,7 @@ function App() {
             {...getHeadingControls('transition-helper')}
             id="transition-heading"
             title="Transition helper"
-            copy="A short checklist to help you switch tasks without losing your place."
+            copy="A quick tick-through when switching tasks, so nothing gets lost."
             icon="transition"
             category="Switch"
           />
@@ -2249,10 +2248,11 @@ function App() {
             <button
               type="button"
               onClick={() => {
-                setStuckRescueSecondsLeft(2 * 60)
+                const duration = 2 * 60
+                setStuckRescueSecondsLeft(duration)
                 setData((prev) => ({
                   ...prev,
-                  stuckRescue: { ...prev.stuckRescue, startedAt: Date.now() },
+                  stuckRescue: { ...prev.stuckRescue, startedAt: Date.now(), durationSeconds: duration },
                 }))
               }}
               disabled={!data.stuckRescue.chosenAction}
@@ -2272,9 +2272,14 @@ function App() {
           )}
 
           {data.stuckRescue.startedAt ? (
-            <p className="meta-line" aria-live="polite">
-              Just getting started: {formatTime(stuckRescueSecondsLeft)} left
-            </p>
+            <>
+              <p className="meta-line" aria-live="polite">
+                Just getting started: {formatTime(stuckRescueSecondsLeft)} left
+              </p>
+              <p className="meta-line">
+                Just see if you can do anything at all for 2 minutes. That's it. No pressure after that.
+              </p>
+            </>
           ) : null}
 
           <button type="button" className="btn-clear" disabled={!hasRescueContent} onClick={resetStuckRescue}>
@@ -2287,7 +2292,7 @@ function App() {
             {...getHeadingControls('time-anchor')}
             id="anchor-heading"
             title="Time anchor"
-            copy="Gentle time nudges while you work, so hours do not disappear."
+            copy="Gentle nudges while you work, so hours don\'t just disappear."
             icon="anchor"
             category="Focus"
           />
@@ -2461,7 +2466,7 @@ function App() {
               ))}
             </ul>
           ) : (
-            <p className="empty-state">No entries yet. Add one to start tracking.</p>
+            <p className="empty-state">Nothing logged yet.</p>
           )}
 
           <button type="button" className="btn-clear" disabled={!hasMoneyTrackerContent} onClick={resetMoneyTracker}>
@@ -2997,7 +3002,7 @@ function App() {
               </ul>
             </>
           ) : (
-            <p className="empty-state">No items yet. Add one to start your checklist.</p>
+            <p className="empty-state">Nothing here yet. Type above and press Enter to add an item.</p>
           )}
 
           <label>
@@ -3035,8 +3040,8 @@ function App() {
           <h2>Keep Calm Space growing</h2>
           <p>
             Calm Space is made by one neurodivergent human for other neurodivergent humans.
-            If it helps you, you can support it on Ko-fi. It helps cover hosting, updates,
-            and new tools. No pressure, it'll be free for everyone forever.
+            If it helps you, you can support it on Ko-fi. It goes towards keeping things running
+            and building new bits. No pressure, it'll be free for everyone forever.
           </p>
           <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
             Support on Ko-fi
@@ -3047,7 +3052,7 @@ function App() {
           <div>
             <p className="footer-kicker">Calm Space</p>
             <p className="footer-note">
-              Calm Space stores your entries in this browser only. If you clear browser data or use another device, your saved data will not move with you.
+              Everything you type here stays on this device. It won’t follow you to another browser or device.
             </p>
           </div>
           <div className="footer-links">
