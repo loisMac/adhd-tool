@@ -203,13 +203,13 @@ const toolTipsText: Record<ToolId, string> = {
   'transition-helper':
     'A quick tick-through when switching tasks, so your brain has a chance to catch up.',
   'stuck-rescue':
-    'Feel stuck and can\'t start? A quick physical reset, then ease into it for just 2 minutes.',
+    "Feel stuck and can't start? A quick physical reset, then ease into it for just 2 minutes.",
   'time-anchor':
-    'Gentle nudges while you work, so hours don\'t just disappear on you.',
+    "Gentle nudges while you work, so hours don't just disappear on you.",
   'wind-down':
     'Use this to close your day without overthinking it.',
   'money-tracker':
-    'Log as you send. That way you always know what\'s waiting to be paid.',
+    "Log as you send. That way you always know what's waiting to be paid.",
   'brain-dump': 'Get it all out, then sort each thought: do today, park for later, or let go.',
   'weekly-review':
     'Short answers are enough. Just notice what helped and what did not.',
@@ -1515,8 +1515,8 @@ function App() {
             <p className="self-care-modal-text">{selfCareModalText}</p>
             <p className="self-care-modal-note">
               {selfCareModalFocus === 'food'
-                ? 'No worries if not. I\'ll check in again in around 30 minutes.'
-                : 'No worries if not. I\'ll check in again in around 30 minutes while you\'re working.'}
+                ? "No worries if not. I'll check in again in around 30 minutes."
+                : "No worries if not. I'll check in again in around 30 minutes while you're working."}
             </p>
             <div className="self-care-modal-actions">
               <button
@@ -2292,7 +2292,7 @@ function App() {
             {...getHeadingControls('time-anchor')}
             id="anchor-heading"
             title="Time anchor"
-            copy="Gentle nudges while you work, so hours don\'t just disappear."
+            copy="Gentle nudges while you work, so hours don't just disappear."
             icon="anchor"
             category="Focus"
           />
