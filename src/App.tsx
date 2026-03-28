@@ -2500,14 +2500,13 @@ function App() {
                 What&apos;s on your mind?
                 <textarea
                   rows={7}
-                  placeholder={"Write freely. Sentences, lists, half-thoughts - all fine.\nGet it all out."}
+                  placeholder={"Write freely. Separate each thought with a full stop or a new line.\nHalf-thoughts, lists, worries - all fine. Get it all out."}
                   value={data.brainDumpInput}
                   onChange={(event) =>
                     setData((prev) => ({ ...prev, brainDumpInput: event.target.value }))
                   }
                 />
               </label>
-              <p className="meta-line">Separate each thought with a full stop or a new line so we can sort them one at a time.</p>
               <button
                 type="button"
                 className="btn-primary"
