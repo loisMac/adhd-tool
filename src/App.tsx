@@ -1618,39 +1618,6 @@ function App() {
     setChunkerTaskInput('')
   }
 
-  const splitChunkerTaskInput = () => {
-    const taskText = chunkerTaskInput.trim()
-    if (!taskText) {
-      return
-    }
-
-    const directSteps = splitTaskClauses(taskText)
-    setData((prev) => {
-      if (directSteps.length >= 3) {
-        return {
-          ...prev,
-          bigTaskInput: taskText,
-          chunkedSteps: directSteps,
-          taskChunker: {
-            ...prev.taskChunker,
-            showFollowUps: false,
-          },
-        }
-      }
-
-      return {
-        ...prev,
-        bigTaskInput: taskText,
-        chunkedSteps: [],
-        taskChunker: {
-          ...prev.taskChunker,
-          showFollowUps: true,
-        },
-      }
-    })
-    setChunkerTaskInput('')
-  }
-
   const toggleChunkerTask = (id: string) => {
     setData((prev) => ({
       ...prev,
@@ -2339,14 +2306,6 @@ function App() {
                 onClick={addChunkerTask}
               >
                 Add
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={!chunkerTaskInput.trim()}
-                onClick={splitChunkerTaskInput}
-              >
-                Split into steps
               </button>
             </div>
 
