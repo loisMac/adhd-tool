@@ -3582,9 +3582,13 @@ function App() {
             <p className="footer-note">
               Everything you type here stays on this device. It won’t follow you to another browser or device.
             </p>
+            <p className="footer-copyright">
+              © 2025-2026 loismakeswebsites. All rights reserved.
+            </p>
           </div>
           <div className="footer-links">
             <a href="/privacy.html">Privacy &amp; data</a>
+            <a href="/terms.html">Terms of service</a>
             <a href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
               Support on Ko-fi
             </a>

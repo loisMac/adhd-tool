@@ -1737,6 +1737,12 @@ button:hover {
   color: var(--ink-muted);
 }
 
+.footer-copyright {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: #a89a8a;
+}
+
 .footer-links {
   display: flex;
   gap: 0.9rem;
