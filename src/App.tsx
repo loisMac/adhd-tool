@@ -23,6 +23,12 @@ type TaskItem = {
   done: boolean
 }
 
+type ChunkerTask = {
+  id: string
+  text: string
+  done: boolean
+}
+
 type InvoiceEntry = {
   id: number
   client: string
@@ -107,6 +113,7 @@ type ProfileData = {
   bigTaskInput: string
   taskChunker: TaskChunkerState
   chunkedSteps: string[]
+  chunkerTasks: ChunkerTask[]
   taskInput: string
   tasks: TaskItem[]
   nextTask: string
@@ -215,7 +222,7 @@ const essentialToolIds: ToolId[] = [
 
 const toolTipsText: Record<ToolId, string> = {
   'task-chunker':
-    'Write it however it comes out. We will turn it into small, doable steps.',
+    'Add your tasks for the day here. Brain Dump items marked \'Do today\' land here automatically. Use the splitter below to break a big task into steps.',
   'body-doubling':
     'Pick a short session and start. Pause whenever you need to.',
   'next-task': 'Keep this list short. The button picks one next step for you.',
@@ -316,6 +323,7 @@ const defaultData = (): ProfileData => ({
     showFollowUps: false,
   },
   chunkedSteps: [],
+  chunkerTasks: [],
   taskInput: '',
   tasks: [],
   nextTask: 'Press the button to pick one task.',
@@ -496,6 +504,7 @@ const loadStoredProfile = (profileId: string) => {
             brainDumpItems: parsed.brainDumpItems ?? [],
             tasks: parsed.tasks ?? [],
             chunkedSteps: parsed.chunkedSteps ?? [],
+            chunkerTasks: parsed.chunkerTasks ?? [],
             invoices: parsed.invoices ?? [],
           }
         })()
@@ -716,6 +725,7 @@ function App() {
   const [toolView, setToolView] = useState<ToolView>(() => loadStoredToolView())
   const [singleToolId, setSingleToolId] = useState<ToolId>(() => loadStoredSingleTool())
   const [collapsedTools, setCollapsedTools] = useState<Record<ToolId, boolean>>(() => defaultCollapsedTools())
+  const [chunkerTaskInput, setChunkerTaskInput] = useState('')
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -1143,6 +1153,8 @@ function App() {
     : false
   const taskChunkerQuestionsOpen = data.taskChunker.showFollowUps
   const hasTaskChunkerContent = Boolean(data.bigTaskInput.trim() || data.chunkedSteps.length > 0)
+  const pendingChunkerTasks = data.chunkerTasks.filter((t) => !t.done)
+  const doneChunkerTasks = data.chunkerTasks.filter((t) => t.done)
   const canAddTask = data.taskInput.trim().length > 0
   const hasCompletedTasks = data.tasks.some((task) => task.done)
   const hasOpenTasks = data.tasks.some((task) => !task.done)
@@ -1594,6 +1606,85 @@ function App() {
     }))
   }
 
+  const addChunkerTask = () => {
+    const text = chunkerTaskInput.trim()
+    if (!text) {
+      return
+    }
+    setData((prev) => ({
+      ...prev,
+      chunkerTasks: [...prev.chunkerTasks, { id: String(Date.now()), text, done: false }],
+    }))
+    setChunkerTaskInput('')
+  }
+
+  const splitChunkerTaskInput = () => {
+    const taskText = chunkerTaskInput.trim()
+    if (!taskText) {
+      return
+    }
+
+    const directSteps = splitTaskClauses(taskText)
+    setData((prev) => {
+      if (directSteps.length >= 3) {
+        return {
+          ...prev,
+          bigTaskInput: taskText,
+          chunkedSteps: directSteps,
+          taskChunker: {
+            ...prev.taskChunker,
+            showFollowUps: false,
+          },
+        }
+      }
+
+      return {
+        ...prev,
+        bigTaskInput: taskText,
+        chunkedSteps: [],
+        taskChunker: {
+          ...prev.taskChunker,
+          showFollowUps: true,
+        },
+      }
+    })
+    setChunkerTaskInput('')
+  }
+
+  const toggleChunkerTask = (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      chunkerTasks: prev.chunkerTasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
+    }))
+  }
+
+  const removeChunkerTask = (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      chunkerTasks: prev.chunkerTasks.filter((t) => t.id !== id),
+    }))
+  }
+
+  const addStepsToChunkerTasks = () => {
+    if (data.chunkedSteps.length === 0) {
+      return
+    }
+    setData((prev) => {
+      const existingTexts = new Set(prev.chunkerTasks.map((t) => t.text))
+      const newTasks = prev.chunkedSteps
+        .filter((step) => !existingTexts.has(step))
+        .map((step) => ({ id: `step-${Date.now()}-${Math.random()}`, text: step, done: false }))
+      return { ...prev, chunkerTasks: [...prev.chunkerTasks, ...newTasks] }
+    })
+  }
+
+  const clearDoneChunkerTasks = () => {
+    setData((prev) => ({
+      ...prev,
+      chunkerTasks: prev.chunkerTasks.filter((t) => !t.done),
+    }))
+  }
+
   const resetBodyDoubling = () => {
     if (!hasBodyDoublingDeviation) {
       return
@@ -1693,12 +1784,24 @@ function App() {
   }
 
   const triageItem = (id: string, triage: 'today' | 'later' | 'release') => {
-    setData((prev) => ({
-      ...prev,
-      brainDumpItems: prev.brainDumpItems.map((item) =>
+    setData((prev) => {
+      const nextItems = prev.brainDumpItems.map((item) =>
         item.id === id ? { ...item, triage } : item,
-      ),
-    }))
+      )
+      const triaged = nextItems.find((item) => item.id === id)
+      const alreadyExists = triaged
+        ? prev.chunkerTasks.some((t) => t.text === triaged.text)
+        : false
+      const nextChunkerTasks =
+        triage === 'today' && triaged && !alreadyExists
+          ? [...prev.chunkerTasks, { id: `bd-${id}`, text: triaged.text, done: false }]
+          : prev.chunkerTasks
+      return {
+        ...prev,
+        brainDumpItems: nextItems,
+        chunkerTasks: nextChunkerTasks,
+      }
+    })
   }
 
   const resetWeeklyReview = () => {
@@ -2198,7 +2301,7 @@ function App() {
             {...getHeadingControls('task-chunker')}
             id="chunker-heading"
             title="Task splitter"
-            copy="Turn one big task into small, clear steps."
+            copy="Track today's tasks and break big ones into steps."
             icon="chunker"
             category="Plan"
           />
@@ -2212,33 +2315,130 @@ function App() {
             </div>
           ) : null}
 
-          <label>
-            Big task
-            <textarea
-              rows={4}
-              placeholder="Example: finish onboarding pack"
-              value={data.bigTaskInput}
-              onChange={(event) =>
-                setData((prev) => ({
-                  ...prev,
-                  bigTaskInput: event.target.value,
-                  chunkedSteps: [],
-                  taskChunker: {
-                    ...prev.taskChunker,
-                    showFollowUps: false,
-                  },
-                }))
-              }
-            />
-          </label>
+          <section className="chunker-today" aria-label="Today's tasks">
+            <h3 className="chunker-section-heading">Today's tasks</h3>
+            <div className="inline-input">
+              <label>
+                Add a task
+                <input
+                  type="text"
+                  placeholder="Example: reply to Sam"
+                  value={chunkerTaskInput}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      addChunkerTask()
+                    }
+                  }}
+                  onChange={(event) => setChunkerTaskInput(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={!chunkerTaskInput.trim()}
+                onClick={addChunkerTask}
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!chunkerTaskInput.trim()}
+                onClick={splitChunkerTaskInput}
+              >
+                Split into steps
+              </button>
+            </div>
 
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!data.bigTaskInput.trim()}
-            onClick={openTaskChunkerGuidance}
-          >
-            Help me break this down
+            {pendingChunkerTasks.length > 0 ? (
+              <ul className="checklist chunker-task-list">
+                {pendingChunkerTasks.map((task) => (
+                  <li key={task.id} className="chunker-task-item">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        onChange={() => toggleChunkerTask(task.id)}
+                      />
+                      <span>{task.text}</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="delete-btn"
+                      aria-label={`Remove: ${task.text}`}
+                      onClick={() => removeChunkerTask(task.id)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">
+                {doneChunkerTasks.length > 0
+                  ? 'All tasks done. Nice work.'
+                  : 'No tasks yet. Add one above, or triage items as "Do today" in Brain Dump.'}
+              </p>
+            )}
+
+            {doneChunkerTasks.length > 0 ? (
+              <div className="chunker-done-pile">
+                <h3 className="chunker-section-heading">Done today</h3>
+                <ul className="checklist chunker-task-list">
+                  {doneChunkerTasks.map((task) => (
+                    <li key={task.id} className="chunker-task-item chunker-task-done">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          onChange={() => toggleChunkerTask(task.id)}
+                        />
+                        <span>{task.text}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className="btn-clear"
+                  onClick={clearDoneChunkerTasks}
+                >
+                  Clear done
+                </button>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="chunker-splitter" aria-label="Split a big task">
+            <h3 className="chunker-section-heading">Split a big task into steps</h3>
+
+            <label>
+              Big task
+              <textarea
+                rows={4}
+                placeholder="Example: finish onboarding pack"
+                value={data.bigTaskInput}
+                onChange={(event) =>
+                  setData((prev) => ({
+                    ...prev,
+                    bigTaskInput: event.target.value,
+                    chunkedSteps: [],
+                    taskChunker: {
+                      ...prev.taskChunker,
+                      showFollowUps: false,
+                    },
+                  }))
+                }
+              />
+            </label>
+
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!data.bigTaskInput.trim()}
+              onClick={openTaskChunkerGuidance}
+            >
+              Help me break this down
           </button>
 
           {taskChunkerQuestionsOpen ? (
@@ -2340,14 +2540,22 @@ function App() {
                   <li key={`${step}-${index}`}>{step}</li>
                 ))}
               </ol>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={addStepsToChunkerTasks}
+              >
+                Add all steps to today's tasks
+              </button>
             </>
           ) : (
             <p className="empty-state">Your step-by-step plan will appear here.</p>
           )}
 
           <button type="button" className="btn-clear" disabled={!hasTaskChunkerContent} onClick={resetTaskChunker}>
-            Clear this tool
+            Clear splitter
           </button>
+          </section>
         </section>
 
         <section id="body-doubling" className={getToolPanelClass('body-doubling')} aria-labelledby="body-double-heading">
@@ -3036,6 +3244,7 @@ function App() {
               {todayBrainDumpItems.length > 0 && (
                 <div className="triage-bucket">
                   <h3 className="triage-bucket-label triage-bucket-label--today">Do today</h3>
+                  <p className="triage-bucket-note">These have been added to Task Splitter.</p>
                   <ul className="triage-bucket-list">
                     {todayBrainDumpItems.map((item) => (
                       <li key={item.id}>{item.text}</li>

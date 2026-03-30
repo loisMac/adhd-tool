@@ -1479,6 +1479,45 @@ button:hover {
   justify-content: flex-end;
 }
 
+.chunker-section-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.02rem;
+}
+
+.chunker-today,
+.chunker-splitter {
+  margin-top: 0.9rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 0.95rem;
+  background: color-mix(in srgb, var(--panel-bg) 94%, white 6%);
+}
+
+.chunker-task-list {
+  margin-top: 0.8rem;
+}
+
+.chunker-task-item {
+  justify-content: space-between;
+}
+
+.chunker-task-item .delete-btn {
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.chunker-done-pile {
+  margin-top: 0.95rem;
+}
+
+.chunker-task-done label span {
+  text-decoration: line-through;
+  color: var(--ink-muted);
+}
+
 .sort-grid {
   margin-top: 0.65rem;
   display: grid;
@@ -1664,6 +1703,12 @@ button:hover {
   color: var(--ink-soft);
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.triage-bucket-note {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
 }
 
 .mode-label {
