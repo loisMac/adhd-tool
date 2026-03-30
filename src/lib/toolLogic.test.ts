@@ -86,6 +86,33 @@ describe('toolLogic', () => {
     })
   })
 
+  it('keeps breakfast reminders active through 11:59', () => {
+    const now = new Date('2026-03-27T11:59:00').getTime()
+
+    expect(getSelfCareReminder({ now })).toEqual({
+      message: 'Had breakfast yet?',
+      focus: 'food',
+    })
+  })
+
+  it('switches to lunch reminders at 12:00', () => {
+    const now = new Date('2026-03-27T12:00:00').getTime()
+
+    expect(getSelfCareReminder({ now })).toEqual({
+      message: 'Had lunch yet?',
+      focus: 'food',
+    })
+  })
+
+  it('stops lunch reminders after the lunch window', () => {
+    const now = new Date('2026-03-27T16:00:00').getTime()
+
+    expect(getSelfCareReminder({ now, lastFoodCheck: now })).toEqual({
+      message: 'Had some water recently?',
+      focus: 'water',
+    })
+  })
+
   it('returns a dinner reminder in the dinner window', () => {
     const now = new Date('2026-03-27T19:00:00').getTime()
 
@@ -153,6 +180,25 @@ describe('toolLogic', () => {
     })
   })
 
+  it('uses frequent pace to nudge posture sooner too', () => {
+    const now = new Date('2026-03-27T16:00:00').getTime()
+    const recentWater = now - 20 * 60 * 1000
+    const recentPosture = now - 75 * 60 * 1000
+
+    expect(
+      getSelfCareReminder({
+        now,
+        lastFoodCheck: now,
+        lastWaterCheck: recentWater,
+        lastPostureCheck: recentPosture,
+        reminderPace: 'frequent',
+      }),
+    ).toEqual({
+      message: 'Want to do a quick posture reset?',
+      focus: 'posture',
+    })
+  })
+
   it('uses gentle pace to delay water reminders', () => {
     const now = new Date('2026-03-27T16:00:00').getTime()
     const recentWater = now - 60 * 60 * 1000
@@ -168,6 +214,28 @@ describe('toolLogic', () => {
       message: 'Want to do a quick posture reset?',
       focus: 'posture',
     })
+  })
+
+  it('uses gentle pace to delay posture reminders', () => {
+    const now = new Date('2026-03-27T16:00:00').getTime()
+    const recentWater = now - 20 * 60 * 1000
+    const recentPosture = now - 100 * 60 * 1000
+
+    expect(
+      getSelfCareReminder({
+        now,
+        lastFoodCheck: now,
+        lastWaterCheck: recentWater,
+        lastPostureCheck: recentPosture,
+        reminderPace: 'gentle',
+      }),
+    ).toBe(null)
+  })
+
+  it('suppresses water and posture reminders overnight', () => {
+    const now = new Date('2026-03-27T22:30:00').getTime()
+
+    expect(getSelfCareReminder({ now, lastFoodCheck: now })).toBe(null)
   })
 
   it('accumulates work time from a stored total and current session', () => {

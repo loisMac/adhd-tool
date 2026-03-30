@@ -551,22 +551,6 @@ const formatClock = (timestamp: number) =>
     minute: '2-digit',
   }).format(timestamp)
 
-const getFoodCheckInPrompt = (hour: number) => {
-  if (hour < 11) {
-    return 'Have you eaten recently, even something small this morning?'
-  }
-
-  if (hour < 15) {
-    return 'Have you eaten recently, or had something for lunch?'
-  }
-
-  if (hour < 20) {
-    return 'Have you eaten recently, or had something since this afternoon?'
-  }
-
-  return 'Have you eaten recently this evening, even a small snack?'
-}
-
 const lowercaseFirst = (text: string) => {
   if (!text) {
     return text
@@ -1121,11 +1105,13 @@ function App() {
     !selfCarePopupGraceActive &&
     (!reminderSnoozeUntil || Date.now() >= reminderSnoozeUntil)
   const selfCareModalText =
-    selfCareModalFocus === 'food'
-      ? getFoodCheckInPrompt(new Date().getHours())
-      : selfCareModalFocus === 'water'
-        ? 'Have you had any water recently?'
-        : 'Quick posture reset? Shoulders down, unclench your jaw, feet on the floor.'
+    selfCareReminder?.focus === selfCareModalFocus
+      ? selfCareReminder.message
+      : selfCareModalFocus === 'food'
+        ? 'Have you eaten recently?'
+        : selfCareModalFocus === 'water'
+          ? 'Have you had any water recently?'
+          : 'Quick posture reset? Shoulders down, unclench your jaw, feet on the floor.'
   const selfCareStatus = formatLastCheck(data.selfCare.lastReset)
 
   useEffect(() => {
