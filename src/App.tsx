@@ -716,6 +716,7 @@ function App() {
   const [stuckRescueSecondsLeft, setStuckRescueSecondsLeft] = useState(0)
   const [activeTool, setActiveTool] = useState<ToolId>('task-chunker')
   const [brainDumpReviewing, setBrainDumpReviewing] = useState(false)
+  const [brainDumpAddInput, setBrainDumpAddInput] = useState('')
   const [selfCareModalFocus, setSelfCareModalFocus] = useState<'food' | 'water' | 'posture' | null>(null)
   const [selfCarePopupGraceActive, setSelfCarePopupGraceActive] = useState(true)
   const [pomodoroWorkInput, setPomodoroWorkInput] = useState(() => String(storedProfile.data.pomodoroWork))
@@ -1709,26 +1710,33 @@ function App() {
         brainDumpItems: [],
       }))
       setBrainDumpReviewing(false)
+      setBrainDumpAddInput('')
     })
   }
 
-  const startBrainDumpTriage = () => {
-    // Parse free-form text: handle newlines, bullet lists, and sentence boundaries
-    const raw = data.brainDumpInput
-    const segments = raw.split('\n').map((l) => l.trim()).filter(Boolean)
-
+  const parseBrainDumpText = (raw: string) => {
+    const segments = raw.split('\n').map((line) => line.trim()).filter(Boolean)
     const items: string[] = []
+
     for (const seg of segments) {
-      // Strip common list markers: "- ", "* ", "• ", "1. ", "2) " etc.
       const stripped = seg.replace(/^[-*•]\s+/, '').replace(/^\d+[.)]\s+/, '')
-      // Split on sentence boundaries (. ! ? followed by a space and a letter)
-      // This avoids splitting "e.g. " or "..." unnecessarily
       const sentences = stripped
         .split(/[.!?]\s+(?=[^\s])/)
-        .map((s) => s.replace(/[.!?,;]+$/, '').trim())
-        .filter((s) => s.length > 1)
-      items.push(...(sentences.length > 1 ? sentences : [stripped.replace(/[.!?,;]+$/, '').trim()].filter((s) => s.length > 1)))
+        .map((sentence) => sentence.replace(/[.!?,;]+$/, '').trim())
+        .filter((sentence) => sentence.length > 1)
+
+      items.push(
+        ...(sentences.length > 1
+          ? sentences
+          : [stripped.replace(/[.!?,;]+$/, '').trim()].filter((sentence) => sentence.length > 1)),
+      )
     }
+
+    return items
+  }
+
+  const startBrainDumpTriage = () => {
+    const items = parseBrainDumpText(data.brainDumpInput)
 
     setData((prev) => ({
       ...prev,
@@ -1739,6 +1747,26 @@ function App() {
       })),
     }))
     setBrainDumpReviewing(true)
+  }
+
+  const addMoreBrainDumpItems = () => {
+    const items = parseBrainDumpText(brainDumpAddInput)
+    if (items.length === 0) {
+      return
+    }
+
+    setData((prev) => ({
+      ...prev,
+      brainDumpItems: [
+        ...prev.brainDumpItems,
+        ...items.map((text) => ({
+          id: `${Date.now()}-${Math.random()}`,
+          text,
+          triage: null,
+        })),
+      ],
+    }))
+    setBrainDumpAddInput('')
   }
 
   const confirmBrainDumpReview = () => setBrainDumpReviewing(false)
@@ -3160,6 +3188,26 @@ function App() {
           ) : (
             /* Phase 3 — triage */
             <>
+              <label>
+                Add more thoughts
+                <textarea
+                  rows={3}
+                  placeholder="Add more and press the button to sort these too"
+                  value={brainDumpAddInput}
+                  onChange={(event) => setBrainDumpAddInput(event.target.value)}
+                />
+              </label>
+              <div className="button-row">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={brainDumpAddInput.trim().length === 0}
+                  onClick={addMoreBrainDumpItems}
+                >
+                  Add to dump
+                </button>
+              </div>
+
               {pendingBrainDumpItems.length > 0 ? (
                 <>
                   <p className="meta-line">
