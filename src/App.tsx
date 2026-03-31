@@ -26,7 +26,7 @@ type TaskItem = {
 type ChunkerTask = {
   id: string
   text: string
-  done: boolean
+  status: 'todo' | 'in-progress' | 'done'
 }
 
 type InvoiceEntry = {
@@ -504,7 +504,11 @@ const loadStoredProfile = (profileId: string) => {
             brainDumpItems: parsed.brainDumpItems ?? [],
             tasks: parsed.tasks ?? [],
             chunkedSteps: parsed.chunkedSteps ?? [],
-            chunkerTasks: parsed.chunkerTasks ?? [],
+            chunkerTasks: (parsed.chunkerTasks ?? [])
+              .map((task, index) =>
+                normalizeChunkerTask(task as Partial<ChunkerTask> & { done?: boolean }, index),
+              )
+              .filter((task): task is ChunkerTask => task !== null),
             invoices: parsed.invoices ?? [],
           }
         })()
@@ -592,6 +596,29 @@ const parseCycleLimitValue = (value: string) => {
   }
 
   return parsed
+}
+
+const normalizeChunkerTask = (
+  task: Partial<ChunkerTask> & { done?: boolean },
+  fallbackIndex: number,
+): ChunkerTask | null => {
+  const text = typeof task.text === 'string' ? task.text.trim() : ''
+  if (!text) {
+    return null
+  }
+
+  const status =
+    task.status === 'todo' || task.status === 'in-progress' || task.status === 'done'
+      ? task.status
+      : task.done
+        ? 'done'
+        : 'todo'
+
+  return {
+    id: typeof task.id === 'string' ? task.id : `chunker-${fallbackIndex}-${Date.now()}`,
+    text,
+    status,
+  }
 }
 
 const playToneSequence = (tones: number[], duration = 0.14, gap = 0.05) => {
@@ -1154,8 +1181,9 @@ function App() {
     : false
   const taskChunkerQuestionsOpen = data.taskChunker.showFollowUps
   const hasTaskChunkerContent = Boolean(data.bigTaskInput.trim() || data.chunkedSteps.length > 0)
-  const pendingChunkerTasks = data.chunkerTasks.filter((t) => !t.done)
-  const doneChunkerTasks = data.chunkerTasks.filter((t) => t.done)
+  const pendingChunkerTasks = data.chunkerTasks.filter((t) => t.status === 'todo')
+  const inProgressChunkerTasks = data.chunkerTasks.filter((t) => t.status === 'in-progress')
+  const doneChunkerTasks = data.chunkerTasks.filter((t) => t.status === 'done')
   const canAddTask = data.taskInput.trim().length > 0
   const hasCompletedTasks = data.tasks.some((task) => task.done)
   const hasOpenTasks = data.tasks.some((task) => !task.done)
@@ -1614,7 +1642,7 @@ function App() {
     }
     setData((prev) => ({
       ...prev,
-      chunkerTasks: [...prev.chunkerTasks, { id: String(Date.now()), text, done: false }],
+      chunkerTasks: [...prev.chunkerTasks, { id: String(Date.now()), text, status: 'todo' }],
     }))
     setChunkerTaskInput('')
   }
@@ -1622,7 +1650,34 @@ function App() {
   const toggleChunkerTask = (id: string) => {
     setData((prev) => ({
       ...prev,
-      chunkerTasks: prev.chunkerTasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
+      chunkerTasks: prev.chunkerTasks.map((task) => {
+        if (task.id !== id) {
+          return task
+        }
+
+        return {
+          ...task,
+          status: task.status === 'done' ? 'todo' : 'done',
+        }
+      }),
+    }))
+  }
+
+  const setChunkerTaskInProgress = (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      chunkerTasks: prev.chunkerTasks.map((task) =>
+        task.id === id ? { ...task, status: 'in-progress' } : task,
+      ),
+    }))
+  }
+
+  const moveChunkerTaskToTodo = (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      chunkerTasks: prev.chunkerTasks.map((task) =>
+        task.id === id ? { ...task, status: 'todo' } : task,
+      ),
     }))
   }
 
@@ -1641,7 +1696,7 @@ function App() {
       const existingTexts = new Set(prev.chunkerTasks.map((t) => t.text))
       const newTasks = prev.chunkedSteps
         .filter((step) => !existingTexts.has(step))
-        .map((step) => ({ id: `step-${Date.now()}-${Math.random()}`, text: step, done: false }))
+        .map((step) => ({ id: `step-${Date.now()}-${Math.random()}`, text: step, status: 'todo' as const }))
       return { ...prev, chunkerTasks: [...prev.chunkerTasks, ...newTasks] }
     })
   }
@@ -1649,7 +1704,7 @@ function App() {
   const clearDoneChunkerTasks = () => {
     setData((prev) => ({
       ...prev,
-      chunkerTasks: prev.chunkerTasks.filter((t) => !t.done),
+      chunkerTasks: prev.chunkerTasks.filter((t) => t.status !== 'done'),
     }))
   }
 
@@ -1789,7 +1844,7 @@ function App() {
         : false
       const nextChunkerTasks =
         triage === 'today' && triaged && !alreadyExists
-          ? [...prev.chunkerTasks, { id: `bd-${id}`, text: triaged.text, done: false }]
+          ? [...prev.chunkerTasks, { id: `bd-${id}`, text: triaged.text, status: 'todo' as const }]
           : prev.chunkerTasks
       return {
         ...prev,
@@ -2349,24 +2404,62 @@ function App() {
                       />
                       <span>{task.text}</span>
                     </label>
-                    <button
-                      type="button"
-                      className="delete-btn"
-                      aria-label={`Remove: ${task.text}`}
-                      onClick={() => removeChunkerTask(task.id)}
-                    >
-                      ×
-                    </button>
+                    <div className="chunker-task-actions">
+                      <button type="button" className="btn-secondary" onClick={() => setChunkerTaskInProgress(task.id)}>
+                        In progress
+                      </button>
+                      <button
+                        type="button"
+                        className="delete-btn"
+                        aria-label={`Remove: ${task.text}`}
+                        onClick={() => removeChunkerTask(task.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="empty-state">
-                {doneChunkerTasks.length > 0
+                {inProgressChunkerTasks.length > 0 || doneChunkerTasks.length > 0
                   ? 'All tasks done. Nice work.'
                   : 'No tasks yet. Add one above, or triage items as "Do today" in Brain Dump.'}
               </p>
             )}
+
+            {inProgressChunkerTasks.length > 0 ? (
+              <div className="chunker-progress-pile">
+                <h3 className="chunker-section-heading">In progress / waiting on reply</h3>
+                <ul className="checklist chunker-task-list">
+                  {inProgressChunkerTasks.map((task) => (
+                    <li key={task.id} className="chunker-task-item">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={false}
+                          onChange={() => toggleChunkerTask(task.id)}
+                        />
+                        <span>{task.text}</span>
+                      </label>
+                      <div className="chunker-task-actions">
+                        <button type="button" className="btn-secondary" onClick={() => moveChunkerTaskToTodo(task.id)}>
+                          Back to to-do
+                        </button>
+                        <button
+                          type="button"
+                          className="delete-btn"
+                          aria-label={`Remove: ${task.text}`}
+                          onClick={() => removeChunkerTask(task.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {doneChunkerTasks.length > 0 ? (
               <div className="chunker-done-pile">

@@ -1501,6 +1501,14 @@ button:hover {
   justify-content: space-between;
 }
 
+.chunker-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .chunker-task-item .delete-btn {
   width: 1.85rem;
   height: 1.85rem;
@@ -1510,6 +1518,10 @@ button:hover {
 }
 
 .chunker-done-pile {
+  margin-top: 0.95rem;
+}
+
+.chunker-progress-pile {
   margin-top: 0.95rem;
 }
 
