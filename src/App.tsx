@@ -2396,15 +2396,11 @@ function App() {
               <ul className="checklist chunker-task-list">
                 {pendingChunkerTasks.map((task) => (
                   <li key={task.id} className="chunker-task-item">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        onChange={() => toggleChunkerTask(task.id)}
-                      />
-                      <span>{task.text}</span>
-                    </label>
+                    <span>{task.text}</span>
                     <div className="chunker-task-actions">
+                      <button type="button" className="btn-secondary" onClick={() => toggleChunkerTask(task.id)}>
+                        Done
+                      </button>
                       <button type="button" className="btn-secondary" onClick={() => setChunkerTaskInProgress(task.id)}>
                         In progress
                       </button>
