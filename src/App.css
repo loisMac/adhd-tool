@@ -1717,6 +1717,23 @@ button:hover {
   overflow-wrap: anywhere;
 }
 
+.triage-bucket-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+}
+
+.triage-bucket-item:last-child {
+  margin-bottom: 0;
+}
+
+.triage-bucket-item .btn-secondary {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .triage-bucket-note {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;

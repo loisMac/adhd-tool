@@ -27,6 +27,7 @@ type ChunkerTask = {
   id: string
   text: string
   status: 'todo' | 'in-progress' | 'done'
+  createdDateKey: string | null
 }
 
 type InvoiceEntry = {
@@ -41,6 +42,7 @@ type BrainDumpItem = {
   id: string
   text: string
   triage: 'today' | 'later' | 'release' | null
+  createdDateKey: string | null
 }
 
 type WindDownItem = {
@@ -501,7 +503,9 @@ const loadStoredProfile = (profileId: string) => {
             stuckRescue: { ...empty.stuckRescue, ...parsed.stuckRescue },
             timeAnchor: { ...empty.timeAnchor, ...parsed.timeAnchor },
             selfCare: { ...empty.selfCare, ...parsed.selfCare },
-            brainDumpItems: parsed.brainDumpItems ?? [],
+            brainDumpItems: (parsed.brainDumpItems ?? [])
+              .map((item, index) => normalizeBrainDumpItem(item as Partial<BrainDumpItem>, index))
+              .filter((item): item is BrainDumpItem => item !== null),
             tasks: parsed.tasks ?? [],
             chunkedSteps: parsed.chunkedSteps ?? [],
             chunkerTasks: (parsed.chunkerTasks ?? [])
@@ -598,6 +602,26 @@ const parseCycleLimitValue = (value: string) => {
   return parsed
 }
 
+const isDateKey = (value: unknown): value is string =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+
+const formatDateKeyLabel = (dateKey: string | null) => {
+  if (!dateKey) {
+    return null
+  }
+
+  const parsed = new Date(`${dateKey}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return dateKey
+  }
+
+  return parsed.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 const normalizeChunkerTask = (
   task: Partial<ChunkerTask> & { done?: boolean },
   fallbackIndex: number,
@@ -618,6 +642,27 @@ const normalizeChunkerTask = (
     id: typeof task.id === 'string' ? task.id : `chunker-${fallbackIndex}-${Date.now()}`,
     text,
     status,
+    createdDateKey: isDateKey(task.createdDateKey) ? task.createdDateKey : null,
+  }
+}
+
+const normalizeBrainDumpItem = (
+  item: Partial<BrainDumpItem>,
+  fallbackIndex: number,
+): BrainDumpItem | null => {
+  const text = typeof item.text === 'string' ? item.text.trim() : ''
+  if (!text) {
+    return null
+  }
+
+  return {
+    id: typeof item.id === 'string' ? item.id : `brain-${fallbackIndex}-${Date.now()}`,
+    text,
+    triage:
+      item.triage === 'today' || item.triage === 'later' || item.triage === 'release'
+        ? item.triage
+        : null,
+    createdDateKey: isDateKey(item.createdDateKey) ? item.createdDateKey : null,
   }
 }
 
@@ -1169,6 +1214,9 @@ function App() {
       ? 'Quiet start is automatic for your first 2 minutes on Calm Space.'
       : null
   const todayDateKey = new Date().toISOString().slice(0, 10)
+  const isFromEarlierDay = (dateKey: string | null) => Boolean(dateKey && dateKey < todayDateKey)
+  const parkedTodayBrainDumpItems = laterBrainDumpItems.filter((item) => !isFromEarlierDay(item.createdDateKey))
+  const parkedEarlierBrainDumpItems = laterBrainDumpItems.filter((item) => isFromEarlierDay(item.createdDateKey))
   const preferredName = data.displayName.trim()
   const reminderSnoozeUntil = selfCareReminder
     ? selfCareReminder.focus === 'food'
@@ -1223,6 +1271,8 @@ function App() {
   const taskChunkerQuestionsOpen = data.taskChunker.showFollowUps
   const hasTaskChunkerContent = Boolean(data.bigTaskInput.trim() || data.chunkedSteps.length > 0)
   const pendingChunkerTasks = data.chunkerTasks.filter((t) => t.status === 'todo')
+  const pendingTodayChunkerTasks = pendingChunkerTasks.filter((task) => !isFromEarlierDay(task.createdDateKey))
+  const pendingEarlierChunkerTasks = pendingChunkerTasks.filter((task) => isFromEarlierDay(task.createdDateKey))
   const inProgressChunkerTasks = data.chunkerTasks.filter((t) => t.status === 'in-progress')
   const doneChunkerTasks = data.chunkerTasks.filter((t) => t.status === 'done')
   const canAddTask = data.taskInput.trim().length > 0
@@ -1683,7 +1733,7 @@ function App() {
     }
     setData((prev) => ({
       ...prev,
-      chunkerTasks: [...prev.chunkerTasks, { id: String(Date.now()), text, status: 'todo' }],
+      chunkerTasks: [...prev.chunkerTasks, { id: String(Date.now()), text, status: 'todo', createdDateKey: todayDateKey }],
     }))
     setChunkerTaskInput('')
   }
@@ -1737,7 +1787,12 @@ function App() {
       const existingTexts = new Set(prev.chunkerTasks.map((t) => t.text))
       const newTasks = prev.chunkedSteps
         .filter((step) => !existingTexts.has(step))
-        .map((step) => ({ id: `step-${Date.now()}-${Math.random()}`, text: step, status: 'todo' as const }))
+        .map((step) => ({
+          id: `step-${Date.now()}-${Math.random()}`,
+          text: step,
+          status: 'todo' as const,
+          createdDateKey: todayDateKey,
+        }))
       return { ...prev, chunkerTasks: [...prev.chunkerTasks, ...newTasks] }
     })
   }
@@ -1840,6 +1895,7 @@ function App() {
         id: `${Date.now()}-${Math.random()}`,
         text,
         triage: null,
+        createdDateKey: todayDateKey,
       })),
     }))
     setBrainDumpReviewing(true)
@@ -1859,6 +1915,7 @@ function App() {
           id: `${Date.now()}-${Math.random()}`,
           text,
           triage: null,
+          createdDateKey: todayDateKey,
         })),
       ],
     }))
@@ -1885,11 +1942,44 @@ function App() {
         : false
       const nextChunkerTasks =
         triage === 'today' && triaged && !alreadyExists
-          ? [...prev.chunkerTasks, { id: `bd-${id}`, text: triaged.text, status: 'todo' as const }]
+          ? [...prev.chunkerTasks, {
+            id: `bd-${id}`,
+            text: triaged.text,
+            status: 'todo' as const,
+            createdDateKey: todayDateKey,
+          }]
           : prev.chunkerTasks
       return {
         ...prev,
         brainDumpItems: nextItems,
+        chunkerTasks: nextChunkerTasks,
+      }
+    })
+  }
+
+  const moveParkedItemToToday = (id: string) => {
+    setData((prev) => {
+      const target = prev.brainDumpItems.find((item) => item.id === id && item.triage === 'later')
+      if (!target) {
+        return prev
+      }
+
+      const alreadyInTasks = prev.chunkerTasks.some((task) => task.text === target.text)
+      const nextBrainDumpItems = prev.brainDumpItems.map((item) =>
+        item.id === id ? { ...item, triage: 'today' as const } : item,
+      )
+      const nextChunkerTasks = alreadyInTasks
+        ? prev.chunkerTasks
+        : [...prev.chunkerTasks, {
+          id: `bd-move-${id}`,
+          text: target.text,
+          status: 'todo' as const,
+          createdDateKey: todayDateKey,
+        }]
+
+      return {
+        ...prev,
+        brainDumpItems: nextBrainDumpItems,
         chunkerTasks: nextChunkerTasks,
       }
     })
@@ -2433,9 +2523,9 @@ function App() {
               </button>
             </div>
 
-            {pendingChunkerTasks.length > 0 ? (
+            {pendingTodayChunkerTasks.length > 0 ? (
               <ul className="checklist chunker-task-list">
-                {pendingChunkerTasks.map((task) => (
+                {pendingTodayChunkerTasks.map((task) => (
                   <li key={task.id} className="chunker-task-item">
                     <span>{task.text}</span>
                     <div className="chunker-task-actions">
@@ -2459,11 +2549,43 @@ function App() {
               </ul>
             ) : (
               <p className="empty-state">
-                {inProgressChunkerTasks.length > 0 || doneChunkerTasks.length > 0
+                {pendingEarlierChunkerTasks.length > 0 || inProgressChunkerTasks.length > 0 || doneChunkerTasks.length > 0
                   ? 'All tasks done. Nice work.'
                   : 'No tasks yet. Add one above, or triage items as "Do today" in Brain Dump.'}
               </p>
             )}
+
+            {pendingEarlierChunkerTasks.length > 0 ? (
+              <div className="chunker-progress-pile">
+                <h3 className="chunker-section-heading">From earlier days</h3>
+                <ul className="checklist chunker-task-list">
+                  {pendingEarlierChunkerTasks.map((task) => (
+                    <li key={task.id} className="chunker-task-item">
+                      <div>
+                        <span>{task.text}</span>
+                        <p className="item-date-note">Added {formatDateKeyLabel(task.createdDateKey)}</p>
+                      </div>
+                      <div className="chunker-task-actions">
+                        <button type="button" className="btn-secondary" onClick={() => toggleChunkerTask(task.id)}>
+                          Done
+                        </button>
+                        <button type="button" className="btn-secondary" onClick={() => setChunkerTaskInProgress(task.id)}>
+                          In progress
+                        </button>
+                        <button
+                          type="button"
+                          className="delete-btn"
+                          aria-label={`Remove: ${task.text}`}
+                          onClick={() => removeChunkerTask(task.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {inProgressChunkerTasks.length > 0 ? (
               <div className="chunker-progress-pile">
@@ -2471,14 +2593,19 @@ function App() {
                 <ul className="checklist chunker-task-list">
                   {inProgressChunkerTasks.map((task) => (
                     <li key={task.id} className="chunker-task-item">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={false}
-                          onChange={() => toggleChunkerTask(task.id)}
-                        />
-                        <span>{task.text}</span>
-                      </label>
+                      <div>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={() => toggleChunkerTask(task.id)}
+                          />
+                          <span>{task.text}</span>
+                        </label>
+                        {isFromEarlierDay(task.createdDateKey) ? (
+                          <p className="item-date-note">Added {formatDateKeyLabel(task.createdDateKey)}</p>
+                        ) : null}
+                      </div>
                       <div className="chunker-task-actions">
                         <button type="button" className="btn-secondary" onClick={() => moveChunkerTaskToTodo(task.id)}>
                           Back to to-do
@@ -3393,11 +3520,47 @@ function App() {
               {laterBrainDumpItems.length > 0 && (
                 <div className="triage-bucket">
                   <h3 className="triage-bucket-label triage-bucket-label--later">Parked</h3>
-                  <ul className="triage-bucket-list">
-                    {laterBrainDumpItems.map((item) => (
-                      <li key={item.id}>{item.text}</li>
-                    ))}
-                  </ul>
+                  {parkedTodayBrainDumpItems.length > 0 ? (
+                    <>
+                      <p className="triage-bucket-note">From today</p>
+                      <ul className="triage-bucket-list">
+                        {parkedTodayBrainDumpItems.map((item) => (
+                          <li key={item.id} className="triage-bucket-item">
+                            <span>{item.text}</span>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => moveParkedItemToToday(item.id)}
+                            >
+                              Move to today
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+                  {parkedEarlierBrainDumpItems.length > 0 ? (
+                    <>
+                      <p className="triage-bucket-note">From earlier days</p>
+                      <ul className="triage-bucket-list">
+                        {parkedEarlierBrainDumpItems.map((item) => (
+                          <li key={item.id} className="triage-bucket-item">
+                            <div>
+                              <span>{item.text}</span>
+                              <span className="item-date-note">Parked {formatDateKeyLabel(item.createdDateKey)}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => moveParkedItemToToday(item.id)}
+                            >
+                              Move to today
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
                 </div>
               )}
 
