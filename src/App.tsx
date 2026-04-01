@@ -881,9 +881,9 @@ function App() {
 
       appWindow.kofiWidgetOverlay.draw('loismakeswebsites', {
         type: 'floating-chat',
-        'floating-chat.donateButton.text': 'Tip Us',
-        'floating-chat.donateButton.background-color': '#00b9fe',
-        'floating-chat.donateButton.text-color': '#fff',
+        'floating-chat.donateButton.text': 'Support Us',
+        'floating-chat.donateButton.background-color': '#ffffff',
+        'floating-chat.donateButton.text-color': '#323842',
       })
       appWindow.__kofiOverlayDrawn = true
     }
