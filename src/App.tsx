@@ -862,6 +862,47 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const overlayDrawnAlready = Boolean(document.querySelector('.floatingchat-container'))
+    const appWindow = window as typeof window & {
+      kofiWidgetOverlay?: {
+        draw: (username: string, options: Record<string, string>) => void
+      }
+      __kofiOverlayDrawn?: boolean
+    }
+
+    const drawOverlay = () => {
+      if (appWindow.__kofiOverlayDrawn || overlayDrawnAlready) {
+        return
+      }
+
+      if (!appWindow.kofiWidgetOverlay) {
+        return
+      }
+
+      appWindow.kofiWidgetOverlay.draw('loismakeswebsites', {
+        type: 'floating-chat',
+        'floating-chat.donateButton.text': 'Tip Us',
+        'floating-chat.donateButton.background-color': '#00b9fe',
+        'floating-chat.donateButton.text-color': '#fff',
+      })
+      appWindow.__kofiOverlayDrawn = true
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[data-kofi-overlay="true"]')
+    if (existingScript) {
+      drawOverlay()
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'
+    script.async = true
+    script.dataset.kofiOverlay = 'true'
+    script.onload = drawOverlay
+    document.body.appendChild(script)
+  }, [])
+
+  useEffect(() => {
     setPomodoroWorkInput(String(data.pomodoroWork))
   }, [data.pomodoroWork])
 
@@ -3876,9 +3917,12 @@ function App() {
             If it helps you, you can support it on Ko-fi. It goes towards keeping things running
             and building new bits. No pressure, it'll be free for everyone forever.
           </p>
-          <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
-            Support on Ko-fi
-          </a>
+          <p className="support-fallback-link">
+            You can also use the floating Tip Us button on this page, or use this link:{' '}
+            <a className="donate" href="https://ko-fi.com/loismakeswebsites" target="_blank" rel="noreferrer">
+              Support on Ko-fi
+            </a>
+          </p>
         </section>
 
         <footer className="site-footer" aria-label="Site footer">
